@@ -6,7 +6,10 @@ import type {
   IssueStatus,
   Priority,
   Project,
+  ProjectHealth,
+  ProjectMilestone,
   ProjectStatus,
+  ProjectUpdate,
 } from "./types";
 
 export const ISSUE_STATUSES: IssueStatus[] = ["backlog", "todo", "progress", "done", "canceled"];
@@ -84,12 +87,27 @@ export type UpdateIssueResult =
   | { ok: true; issue: Issue }
   | { ok: false; error: "unknown-issue" | "self-parent" | "unknown-parent" | "unknown-project" };
 
+export type Progress = {
+  scope: number;
+  started: number;
+  completed: number;
+  ratio: number;
+};
+
+export type CreateProjectUpdateInput = {
+  health: ProjectHealth;
+  body: string;
+  author?: string;
+  time?: string;
+};
+
 export type KernelSeed = {
   viewer?: string;
   teamKey?: string;
   issues?: Issue[];
   projects?: Project[];
   views?: CustomView[];
+  milestones?: ProjectMilestone[];
 };
 
 export type ProductKernel = {
@@ -108,6 +126,10 @@ export type ProductKernel = {
   getProject(id: string): Project | undefined;
   createProject(input: CreateProjectInput): Project;
   updateProject(id: string, patch: ProjectPatch): { ok: true; project: Project } | { ok: false };
+  addProjectUpdate(projectId: string, input: CreateProjectUpdateInput): ProjectUpdate | undefined;
+  projectProgress(projectId: string): Progress;
+  milestoneProgress(milestoneId: string): Progress;
+  projectHealth(projectId: string): ProjectHealth | undefined;
   createIssue(input: CreateIssueInput): Issue;
   updateIssue(id: string, patch: IssuePatch): UpdateIssueResult;
 };
@@ -118,9 +140,16 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
   let issues = (seed.issues ?? []).map(copyIssue);
   let projects = (seed.projects ?? []).map(copyProject);
   const views = (seed.views ?? []).map(copyView);
+  const milestones = (seed.milestones ?? []).map((item) => ({ ...item }));
 
   function teamIssues(): Issue[] {
     return issues.filter((item) => item.teamKey === teamKey);
+  }
+
+  function issuesForProject(projectId: string): Issue[] {
+    const project = findProject(projects, projectId);
+    if (!project) return [];
+    return issues.filter((item) => item.projectId === project.id);
   }
 
   return {
@@ -135,11 +164,7 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
     myIssuesCreated: () => teamIssues().filter((item) => item.creator === viewer),
     myIssuesSubscribed: () => teamIssues().filter((item) => item.subscribed),
     groupIssues: (items, grouping) => groupIssueList(items, grouping, projects),
-    projectIssues(projectId) {
-      const project = findProject(projects, projectId);
-      if (!project) return [];
-      return issues.filter((item) => item.projectId === project.id);
-    },
+    projectIssues: issuesForProject,
     getProject: (id) => findProject(projects, id),
     createProject(input) {
       const slugId = uniqueSlug(input.slugId ?? slugify(input.name), projects);
@@ -172,6 +197,31 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
       applyProjectPatch(current, patch);
       projects = projects.slice();
       return { ok: true, project: current };
+    },
+    addProjectUpdate(projectId, input) {
+      const current = findProject(projects, projectId);
+      if (!current) return undefined;
+      const update: ProjectUpdate = {
+        id: `upd-${current.updates.length + 1}-${Date.now()}`,
+        health: input.health,
+        body: input.body,
+        author: input.author ?? viewer,
+        time: input.time ?? "now",
+      };
+      current.updates = [update, ...current.updates];
+      projects = projects.slice();
+      return update;
+    },
+    projectProgress(projectId) {
+      return estimateProgress(issuesForProject(projectId));
+    },
+    milestoneProgress(milestoneId) {
+      if (!milestones.some((item) => item.id === milestoneId)) return estimateProgress([]);
+      return estimateProgress(issues.filter((item) => item.milestoneId === milestoneId));
+    },
+    projectHealth(projectId) {
+      const current = findProject(projects, projectId);
+      return current?.updates[0]?.health;
     },
     createIssue(input) {
       const id = nextIdentifier(issues, teamKey);
@@ -252,6 +302,20 @@ function groupIssueList(issues: Issue[], grouping: IssueGrouping, projects: Proj
     label: id === "none" ? "No project" : (projects.find((item) => item.id === id)?.name ?? id),
     items: issues.filter((item) => (item.projectId ?? "none") === id),
   }));
+}
+
+export function estimateProgress(issues: Issue[]): Progress {
+  const live = issues.filter((item) => item.status !== "canceled");
+  const scope = live.reduce((sum, item) => sum + issueWeight(item), 0);
+  const started = live
+    .filter((item) => item.status === "progress")
+    .reduce((sum, item) => sum + issueWeight(item), 0);
+  const completed = live.filter((item) => item.status === "done").reduce((sum, item) => sum + issueWeight(item), 0);
+  return { scope, started, completed, ratio: scope === 0 ? 0 : (completed + 0.25 * started) / scope };
+}
+
+function issueWeight(issue: Issue): number {
+  return issue.estimate ?? 1;
 }
 
 function nextIdentifier(issues: Issue[], teamKey: string): string {
@@ -336,7 +400,7 @@ function copyIssue(issue: Issue): Issue {
 }
 
 function copyProject(project: Project): Project {
-  return {
+  const copied: Project = {
     ...project,
     memberIds: [...project.memberIds],
     teamKeys: [...project.teamKeys],
@@ -347,6 +411,8 @@ function copyProject(project: Project): Project {
     resources: project.resources.map((item) => ({ ...item })),
     updates: project.updates.map((item) => ({ ...item })),
   };
+  delete (copied as { health?: unknown }).health;
+  return copied;
 }
 
 function copyView(view: CustomView): CustomView {

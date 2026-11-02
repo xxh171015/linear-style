@@ -170,6 +170,7 @@ export default function App() {
       issues: seedIssues,
       projects: seedProjects,
       views: seedViews,
+      milestones: seedMilestones,
     });
   }
   const kernel = kernelRef.current;
@@ -1173,7 +1174,12 @@ export default function App() {
                     onSend={sendAgent}
                   />
                 ) : nav === "projects" && !activeProject ? (
-                  <ProjectList projects={projects} issues={issues} onOpen={openProject} />
+                  <ProjectList
+                    projects={projects}
+                    progressOf={(id) => kernel.projectProgress(id)}
+                    healthOf={(id) => kernel.projectHealth(id)}
+                    onOpen={openProject}
+                  />
                 ) : nav === "projects" && activeProject ? (
                   <ProjectPage
                     project={activeProject}
@@ -1182,6 +1188,9 @@ export default function App() {
                     initiatives={initiatives}
                     activity={activity.filter((item) => kernel.projectIssues(activeProject.id).some((issue) => issue.id === item.issueId))}
                     tab={projectTab}
+                    progress={kernel.projectProgress(activeProject.id)}
+                    health={kernel.projectHealth(activeProject.id)}
+                    milestoneProgress={(id) => kernel.milestoneProgress(id)}
                     onTab={(next) => go({ nav: "projects", projectId: activeProject.id, projectTab: next })}
                     onOpenIssue={openIssue}
                     onCycleStatus={() =>

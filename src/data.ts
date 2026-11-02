@@ -28,7 +28,6 @@ export const seedProjects: Project[] = [
     labels: [],
     startDate: "Nov 2",
     targetDate: "Nov 30",
-    health: "onTrack",
     slackChannel: "Xxh",
     weekProgress: [
       "建好 Project「个人研发节奏试用」与三个 Milestone：调研 / MVP / 可演示",

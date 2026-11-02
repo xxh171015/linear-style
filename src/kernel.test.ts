@@ -313,7 +313,7 @@ describe("Project Issues membership", () => {
     expect(created.startDate).toBeUndefined();
     expect(created.targetDate).toBeUndefined();
     expect(created.updates).toEqual([]);
-    expect(created.health).toBeUndefined();
+    expect(created).not.toHaveProperty("health");
   });
 
   test("Project status is only backlog, planned, started, paused, completed, or canceled", () => {
@@ -349,6 +349,99 @@ describe("Project Issues membership", () => {
     expect(kernel.views()).toHaveLength(1);
     expect(kernel.views()[0]?.id).toBe("atlas-query");
     expect(kernel.getProject("atlas")?.id).not.toBe(kernel.views()[0]?.id);
+  });
+});
+
+describe("Project progress and health", () => {
+  const atlas = project({ id: "atlas", name: "Atlas" });
+
+  test("empty live scope is 0 progress, not 100%", () => {
+    const kernel = kernelWith([], { projects: [atlas] });
+    expect(kernel.projectProgress("atlas").ratio).toBe(0);
+  });
+
+  test("all live Issues done is 100% and all in progress is 25%", () => {
+    const done = kernelWith(
+      [issue({ id: "XXH-1", title: "Done", status: "done", projectId: "atlas", estimate: 2 })],
+      { projects: [atlas] },
+    );
+    expect(done.projectProgress("atlas").ratio).toBe(1);
+    const started = kernelWith(
+      [issue({ id: "XXH-1", title: "Doing", status: "progress", projectId: "atlas" })],
+      { projects: [atlas] },
+    );
+    expect(started.projectProgress("atlas").ratio).toBe(0.25);
+  });
+
+  test("unestimated live work counts as 1 point and explicit 0 counts as 0; canceled is out of live scope", () => {
+    const kernel = kernelWith(
+      [
+        issue({ id: "XXH-1", title: "Done big", status: "done", projectId: "atlas", estimate: 3 }),
+        issue({ id: "XXH-2", title: "Unestimated todo", status: "todo", projectId: "atlas" }),
+        issue({ id: "XXH-3", title: "Zero", status: "todo", projectId: "atlas", estimate: 0 }),
+        issue({ id: "XXH-4", title: "Canceled", status: "canceled", projectId: "atlas", estimate: 8 }),
+      ],
+      { projects: [atlas] },
+    );
+    const progress = kernel.projectProgress("atlas");
+    expect(progress.scope).toBe(4);
+    expect(progress.completed).toBe(3);
+    expect(progress.ratio).toBe(0.75);
+  });
+
+  test("progress is the formula with no 99% cap", () => {
+    const kernel = kernelWith(
+      [
+        issue({ id: "XXH-1", title: "Almost", status: "done", projectId: "atlas", estimate: 99 }),
+        issue({ id: "XXH-2", title: "Last", status: "todo", projectId: "atlas", estimate: 1 }),
+      ],
+      { projects: [atlas] },
+    );
+    expect(kernel.projectProgress("atlas").ratio).toBe(0.99);
+  });
+
+  test("Milestone progress uses Estimate points, not completed counts, and empty is 0", () => {
+    const kernel = createKernel({
+      viewer,
+      teamKey,
+      projects: [atlas],
+      milestones: [{ id: "ms-1", projectId: "atlas", name: "Ship", sortOrder: 1 }],
+      issues: [
+        issue({ id: "XXH-1", title: "Done", status: "done", projectId: "atlas", milestoneId: "ms-1", estimate: 3 }),
+        issue({ id: "XXH-2", title: "Todo", status: "todo", projectId: "atlas", milestoneId: "ms-1", estimate: 1 }),
+      ],
+    });
+    expect(kernel.milestoneProgress("ms-1").ratio).toBe(0.75);
+    expect(kernel.milestoneProgress("missing").ratio).toBe(0);
+  });
+
+  test("no Project updates means no health; latest update wins; progress and health can disagree", () => {
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "Done", status: "done", projectId: "atlas" })],
+      { projects: [atlas] },
+    );
+    expect(kernel.projectHealth("atlas")).toBeUndefined();
+    expect(kernel.projectProgress("atlas").ratio).toBe(1);
+    kernel.addProjectUpdate("atlas", { health: "atRisk", body: "Slip" });
+    expect(kernel.projectHealth("atlas")).toBe("atRisk");
+    kernel.addProjectUpdate("atlas", { health: "offTrack", body: "Worse" });
+    expect(kernel.projectHealth("atlas")).toBe("offTrack");
+    expect(kernel.projectProgress("atlas").ratio).toBe(1);
+    expect(kernel.getProject("atlas")).not.toHaveProperty("health");
+  });
+
+  test("a leftover stored health field does not win over the latest Project update", () => {
+    const drifted = Object.assign(
+      project({
+        id: "atlas",
+        name: "Atlas",
+        updates: [{ id: "u1", health: "atRisk", body: "Slip", author: viewer, time: "now" }],
+      }),
+      { health: "onTrack" },
+    );
+    const kernel = kernelWith([], { projects: [drifted] });
+    expect(kernel.projectHealth("atlas")).toBe("atRisk");
+    expect(kernel.getProject("atlas")).not.toHaveProperty("health");
   });
 });
 

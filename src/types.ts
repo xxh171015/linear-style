@@ -104,7 +104,6 @@ export type Project = {
   labels: string[];
   startDate?: string;
   targetDate?: string;
-  health?: ProjectHealth;
   slackChannel?: string;
   weekProgress: string[];
   nextFocus: string[];

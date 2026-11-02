@@ -14,7 +14,8 @@ import {
   StatusTodoIcon,
   ViewsIcon,
 } from "./icons";
-import { HEALTH_LABEL, PRIORITY_LABEL, PROJECT_STATUS_LABEL, matchesView, milestoneStats, projectScope } from "./logic";
+import type { Progress } from "./kernel";
+import { HEALTH_LABEL, PRIORITY_LABEL, PROJECT_STATUS_LABEL, matchesView } from "./logic";
 import type {
   Activity,
   CustomView,
@@ -27,9 +28,8 @@ import type {
   ProjectTab,
 } from "./types";
 
-function HealthDot({ health }: { health?: ProjectHealth }) {
-  const tone = health ?? "onTrack";
-  return <span className={`health-dot ${tone}`} />;
+function HealthDot({ health }: { health: ProjectHealth }) {
+  return <span className={`health-dot ${health}`} />;
 }
 
 function ProjectStatusMark({ status }: { status: ProjectStatus }) {
@@ -40,28 +40,30 @@ function ProjectStatusMark({ status }: { status: ProjectStatus }) {
 
 export function ProjectList({
   projects,
-  issues,
+  progressOf,
+  healthOf,
   onOpen,
 }: {
   projects: Project[];
-  issues: Issue[];
+  progressOf: (id: string) => Progress;
+  healthOf: (id: string) => ProjectHealth | undefined;
   onOpen: (id: string) => void;
 }) {
   return (
     <ul className="entity-list">
       {projects.map((project) => {
-        const scoped = issues.filter((issue) => issue.projectId === project.id);
-        const progress = projectScope(scoped);
+        const progress = progressOf(project.id);
+        const health = healthOf(project.id);
         return (
           <li key={project.id}>
             <button type="button" className="entity-row" onClick={() => onOpen(project.id)}>
               <CubeIcon />
               <span className="entity-title">{project.name}</span>
               <span className="chip">{PROJECT_STATUS_LABEL[project.status]}</span>
-              {project.health ? (
+              {health ? (
                 <span className="health-chip">
-                  <HealthDot health={project.health} />
-                  {HEALTH_LABEL[project.health]}
+                  <HealthDot health={health} />
+                  {HEALTH_LABEL[health]}
                 </span>
               ) : null}
               <span className="entity-meta">{project.lead}</span>
@@ -114,6 +116,9 @@ export function ProjectPage({
   initiatives,
   activity,
   tab,
+  progress,
+  health,
+  milestoneProgress,
   onTab,
   onOpenIssue,
   onCycleStatus,
@@ -125,13 +130,15 @@ export function ProjectPage({
   initiatives: Initiative[];
   activity: Activity[];
   tab: ProjectTab;
+  progress: Progress;
+  health?: ProjectHealth;
+  milestoneProgress: (id: string) => Progress;
   onTab: (tab: ProjectTab) => void;
   onOpenIssue: (id: string) => void;
   onCycleStatus: () => void;
   onCyclePriority: () => void;
 }) {
   const scoped = issues;
-  const progress = projectScope(scoped);
   const latest = project.updates[0];
   const linked = initiatives.filter((item) => project.initiativeIds.includes(item.id));
   const ownedMilestones = milestones
@@ -199,11 +206,11 @@ export function ProjectPage({
 
         {tab === "overview" ? (
           <div className="project-overview">
-            {latest ? (
+            {latest && health ? (
               <div className="update-card">
                 <div className="update-head">
-                  <HealthDot health={latest.health} />
-                  <strong>{HEALTH_LABEL[latest.health]}</strong>
+                  <HealthDot health={health} />
+                  <strong>{HEALTH_LABEL[health]}</strong>
                   <span className="row-avatar">{latest.author.slice(0, 1)}</span>
                   <span className="issue-date">{latest.author}</span>
                   <span className="issue-date">{latest.time}</span>
@@ -306,16 +313,14 @@ export function ProjectPage({
 
         <p className="props-label">Milestones</p>
         {ownedMilestones.map((milestone) => {
-          const stats = milestoneStats(milestone, scoped);
+          const bar = milestoneProgress(milestone.id);
           return (
             <div className="milestone" key={milestone.id}>
               <span className="milestone-name">{milestone.name}</span>
-              <span className="issue-date">
-                {stats.percent}% of {stats.total}
-              </span>
+              <span className="issue-date">{Math.round(bar.ratio * 100)}%</span>
               <span className="issue-date">{milestone.targetDate}</span>
               <span className="milestone-bar">
-                <span style={{ width: `${stats.percent}%` }} />
+                <span style={{ width: `${bar.ratio * 100}%` }} />
               </span>
             </div>
           );

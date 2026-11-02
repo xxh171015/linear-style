@@ -6,7 +6,6 @@ import type {
   IssueStatus,
   IssueTab,
   NavId,
-  ProjectMilestone,
   ProjectStatus,
   ProjectTab,
 } from "./types";
@@ -45,35 +44,6 @@ export function nextProjectStatus(status: ProjectStatus): ProjectStatus {
   return PROJECT_STATUSES[(PROJECT_STATUSES.indexOf(status) + 1) % PROJECT_STATUSES.length];
 }
 
-export function issueWeight(issue: Issue): number {
-  return issue.estimate ?? 1;
-}
-
-/**
- * Linear Project.progress:
- * (completed estimate points + 0.25 * in-progress estimate points) / total estimate points.
- * This replica uses estimate when set, otherwise 1 point per issue.
- */
-export function projectScope(issues: Issue[]) {
-  const live = issues.filter((issue) => issue.status !== "canceled");
-  const scope = live.reduce((sum, issue) => sum + issueWeight(issue), 0);
-  const started = live
-    .filter((issue) => issue.status === "progress")
-    .reduce((sum, issue) => sum + issueWeight(issue), 0);
-  const completed = live
-    .filter((issue) => issue.status === "done")
-    .reduce((sum, issue) => sum + issueWeight(issue), 0);
-  const ratio = scope === 0 ? 0 : (completed + 0.25 * started) / scope;
-  return { scope, started, completed, ratio };
-}
-
-export function milestoneStats(milestone: ProjectMilestone, issues: Issue[]) {
-  const items = issues.filter((issue) => issue.milestoneId === milestone.id && issue.status !== "canceled");
-  const completed = items.filter((issue) => issue.status === "done").length;
-  const total = items.length;
-  const percent = total === 0 ? 0 : Math.round((completed / total) * 100);
-  return { completed, total, percent };
-}
 
 export function matchesView(issue: Issue, view: CustomView, viewer: string): boolean {
   if (view.modelName !== "Issue") return false;
