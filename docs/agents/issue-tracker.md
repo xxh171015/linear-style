@@ -2,15 +2,15 @@
 
 Issues and specs for this repo live in **Linear**, not GitHub Issues.
 
-| Field | Value |
-| --- | --- |
-| Workspace | [xuxinghua](https://linear.app/xuxinghua) |
-| Team key | `XXH` |
-| Issue IDs | `XXH-<n>` (e.g. `XXH-11`) |
-| Project (optional home) | 个人研发节奏试用 |
-| CLI (preferred) | [`@schpet/linear-cli`](https://github.com/schpet/linear-cli) (`linear` on PATH, or `npx @schpet/linear-cli`) |
-| Official `@linear/cli` | **Do not use** — abandoned (`lin new` / `lin checkout` only, last useful publish 2021) |
-| MCP | Optional for interactive agents; **not** enough for Sandcastle (needs shell LIST/VIEW/CLOSE) |
+| Field                   | Value                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Workspace               | [xuxinghua](https://linear.app/xuxinghua)                                                                    |
+| Team key                | `XXH`                                                                                                        |
+| Issue IDs               | `XXH-<n>` (e.g. `XXH-11`)                                                                                    |
+| Project (optional home) | 个人研发节奏试用                                                                                             |
+| CLI (preferred)         | [`@schpet/linear-cli`](https://github.com/schpet/linear-cli) (`linear` on PATH, or `npx @schpet/linear-cli`) |
+| Official `@linear/cli`  | **Do not use** — abandoned (`lin new` / `lin checkout` only, last useful publish 2021)                       |
+| MCP                     | Optional for interactive agents; **not** enough for Sandcastle (needs shell LIST/VIEW/CLOSE)                 |
 
 Domain language (`GLOSSARY.md`, `docs/adr/`) lives in **git**. Do not treat Linear long descriptions as the glossary/ADR source of truth.
 
@@ -57,15 +57,17 @@ Always pass `--no-input` in scripts so missing flags fail instead of prompting.
 
 ## Label vocabulary (Matt triage roles → Linear)
 
-| Role in mattpocock/skills | Label / place in Linear | Meaning | Enter Cycle? |
-| --- | --- | --- | --- |
-| `needs-triage` | **Triage inbox** (workflow state `Triage`); optional label `needs-triage` | Just arrived; maintainer must evaluate | No |
-| `needs-info` | Label **`needs-spec`** | Spec incomplete; grill / to-spec before scheduling | No |
-| `ready-for-agent` | Label **`ready-for-agent`** | Fully specified + Agent Brief; AFK-safe | Yes (Focus) |
-| `ready-for-human` | Label **`ready-for-human`** | Requires a human implementer | Yes |
-| `wontfix` | Label **`wontfix`**, then cancel | Will not be actioned | No |
+| Role in mattpocock/skills | Label / place in Linear                                                   | Meaning                                            | Enter Cycle? |
+| ------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- | ------------ |
+| `needs-triage`            | **Triage inbox** (workflow state `Triage`); optional label `needs-triage` | Just arrived; maintainer must evaluate             | No           |
+| `needs-info`              | Label **`needs-spec`**                                                    | Spec incomplete; grill / to-spec before scheduling | No           |
+| `ready-for-agent`         | Label **`ready-for-agent`**                                               | Fully specified + Agent Brief; AFK-safe            | Yes (Focus)  |
+| `ready-for-human`         | Label **`ready-for-human`**                                               | Requires a human implementer                       | Yes          |
+| `wontfix`                 | Label **`wontfix`**, then cancel                                          | Will not be actioned                               | No           |
 
 Hard rule for this repo: **no Cycle placement without `ready-for-agent` or `ready-for-human`.** Tickets still labelled `needs-spec` stay in Triage/Backlog.
+
+Applying `ready-for-agent` is not enough for Sandcastle by itself: Linear creates issues in **Triage**, and `/to-tickets` children inherit that. Always pass **`--state Backlog`** on create or update when labelling `ready-for-agent`. LIST also includes Triage as a safety net so a forgotten state move still shows up.
 
 Ensure labels exist once (idempotent create is fine if already present):
 
@@ -106,6 +108,20 @@ linear issue create \
 
 Optional flags: `--project "个人研发节奏试用"`, `--parent XXH-5`, `--priority high|medium|low|urgent|none`, `--state Triage|Backlog`, `--cycle active|next`.
 
+`ready-for-agent` issues **must** leave Triage:
+
+```bash
+linear issue create \
+  --team XXH \
+  --title "Child slice" \
+  --parent XXH-5 \
+  --description-file /tmp/issue-body.md \
+  --label ready-for-agent \
+  --state Backlog \
+  --no-input \
+  --yes
+```
+
 Prefer `--description-file` / `--body-file` for any multi-line Markdown (avoids shell escaping and literal `\n`).
 
 ### Read an issue
@@ -129,7 +145,7 @@ linear issue query --team XXH --label needs-spec --json --limit all --no-input
 
 # AFK queue (Sandcastle LIST — see below)
 linear issue query --team XXH --label ready-for-agent \
-  --state unstarted --state started --state backlog \
+  --state triage --state unstarted --state started --state backlog \
   --json --limit all --no-input
 ```
 
@@ -158,6 +174,7 @@ linear issue update XXH-11 --remove-label needs-spec --no-input
 linear issue update XXH-11 \
   --remove-label needs-spec \
   --add-label ready-for-agent \
+  --state Backlog \
   --no-input
 
 # Replace entire label set (destructive)
@@ -180,9 +197,11 @@ Prefer `Done` / `Canceled` over `issue archive` (archive bypasses Linear's norma
 ### Parent / sub-issue
 
 ```bash
-# At create time
+# At create time (AFK child: leave Triage)
 linear issue create --team XXH --title "Child slice" --parent XXH-5 \
-  --description-file /tmp/body.md --no-input --yes
+  --description-file /tmp/body.md \
+  --label ready-for-agent --state Backlog \
+  --no-input --yes
 
 # After the fact
 linear issue update XXH-12 --parent XXH-5 --no-input
@@ -234,10 +253,10 @@ Sandcastle has no first-party Linear integration. Use `sandcastle init --issue-t
 
 Wrapper scripts live under `scripts/` (optional but recommended):
 
-| Slot | Command |
-| --- | --- |
-| **LIST** | `scripts/linear-list-ready.sh` |
-| **VIEW** | `scripts/linear-view.sh <ID>` |
+| Slot      | Command                        |
+| --------- | ------------------------------ |
+| **LIST**  | `scripts/linear-list-ready.sh` |
+| **VIEW**  | `scripts/linear-view.sh <ID>`  |
 | **CLOSE** | `scripts/linear-close.sh <ID>` |
 
 Equivalent one-liners:
@@ -245,7 +264,7 @@ Equivalent one-liners:
 ```bash
 # LIST — JSON array of ready-for-agent issues
 linear issue query --team XXH --label ready-for-agent \
-  --state unstarted --state started --state backlog \
+  --state triage --state unstarted --state started --state backlog \
   --json --limit all --no-input \
   | jq '[.[] | {id: .identifier, number: .identifier, title, body: (.description // ""), labels: [.labels[].name]}]'
 

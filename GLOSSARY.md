@@ -44,8 +44,8 @@ A named, shareable saved query over Issues, identified by a slug. It has a flatt
 _Avoid_: View (unqualified), saved search, View Preferences, FilterMatcher
 
 **View filter**:
-The Custom View's membership: an AND of optional conditions (assigned to me, created by me, subscribed, statuses, project, labels, priority). Not Linear's IssueFilter comparator tree.
-_Avoid_: CustomViewFilter (Linear's name for filtering the list of views)
+The Custom View's membership: an AND of the conditions that are set (assigned to me, created by me, subscribed, one-of statuses, a project, any-of labels, priority). Unset conditions do not constrain, so a filter with none set matches every Issue in the Team; priority No priority is a set condition, and only a missing priority is unset.
+_Avoid_: CustomViewFilter (Linear's name for filtering the list of views), IssueFilter
 
 **Built-in list**:
 My Issues, Team Issues, or a Project's Issues tab. These are queries, not Custom Views. They may use the same grouping and layout words as a Custom View, but those settings are not saved as a Custom View.
