@@ -1,8 +1,6 @@
 import { ISSUE_STATUSES, PROJECT_STATUSES } from "./kernel";
 import type {
-  CustomView,
   Frame,
-  Issue,
   IssueStatus,
   IssueTab,
   NavId,
@@ -42,20 +40,6 @@ export function nextStatus(status: IssueStatus): IssueStatus {
 
 export function nextProjectStatus(status: ProjectStatus): ProjectStatus {
   return PROJECT_STATUSES[(PROJECT_STATUSES.indexOf(status) + 1) % PROJECT_STATUSES.length];
-}
-
-
-export function matchesView(issue: Issue, view: CustomView, viewer: string): boolean {
-  if (view.modelName !== "Issue") return false;
-  const filter = view.filter;
-  if (filter.assignedToMe && issue.assignee !== viewer) return false;
-  if (filter.createdByMe && issue.creator !== viewer) return false;
-  if (filter.subscribed && !issue.subscribed) return false;
-  if (filter.statuses?.length && !filter.statuses.includes(issue.status)) return false;
-  if (filter.projectId && issue.projectId !== filter.projectId) return false;
-  if (filter.labels?.length && !filter.labels.some((label) => issue.labels.includes(label))) return false;
-  if (filter.priority !== undefined && issue.priority !== filter.priority) return false;
-  return true;
 }
 
 export function emptyFrame(): Pick<Frame, "projectId" | "viewId" | "projectTab" | "issueId"> {

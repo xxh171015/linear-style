@@ -1,5 +1,6 @@
 import type {
   CustomView,
+  CustomViewFilter,
   Issue,
   IssueGroup,
   IssueGrouping,
@@ -10,6 +11,7 @@ import type {
   ProjectMilestone,
   ProjectStatus,
   ProjectUpdate,
+  ViewLayout,
 } from "./types";
 
 export const ISSUE_STATUSES: IssueStatus[] = ["backlog", "todo", "progress", "done", "canceled"];
@@ -101,6 +103,17 @@ export type CreateProjectUpdateInput = {
   time?: string;
 };
 
+export type CreateCustomViewInput = {
+  name: string;
+  description?: string;
+  slugId?: string;
+  shared?: boolean;
+  grouping?: IssueGrouping;
+  layout?: ViewLayout;
+  filter?: CustomViewFilter;
+  icon?: CustomView["icon"];
+};
+
 export type KernelSeed = {
   viewer?: string;
   teamKey?: string;
@@ -132,6 +145,9 @@ export type ProductKernel = {
   projectHealth(projectId: string): ProjectHealth | undefined;
   createIssue(input: CreateIssueInput): Issue;
   updateIssue(id: string, patch: IssuePatch): UpdateIssueResult;
+  getCustomView(id: string): CustomView | undefined;
+  customViewIssues(viewId: string): Issue[];
+  createCustomView(input: CreateCustomViewInput): CustomView;
 };
 
 export function createKernel(seed: KernelSeed = {}): ProductKernel {
@@ -139,7 +155,7 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
   const teamKey = seed.teamKey ?? "XXH";
   let issues = (seed.issues ?? []).map(copyIssue);
   let projects = (seed.projects ?? []).map(copyProject);
-  const views = (seed.views ?? []).map(copyView);
+  let views = (seed.views ?? []).map(copyView);
   const milestones = (seed.milestones ?? []).map((item) => ({ ...item }));
 
   function teamIssues(): Issue[] {
@@ -167,7 +183,7 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
     projectIssues: issuesForProject,
     getProject: (id) => findProject(projects, id),
     createProject(input) {
-      const slugId = uniqueSlug(input.slugId ?? slugify(input.name), projects);
+      const slugId = uniqueSlug(input.slugId ?? slugify(input.name), projectSlugs(projects));
       const created: Project = {
         id: slugId,
         slugId,
@@ -222,6 +238,30 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
     projectHealth(projectId) {
       const current = findProject(projects, projectId);
       return current?.updates[0]?.health;
+    },
+    getCustomView: (id) => findCustomView(views, id),
+    customViewIssues(viewId) {
+      const current = findCustomView(views, viewId);
+      if (!current || current.modelName !== "Issue") return [];
+      return teamIssues().filter((item) => matchesViewFilter(item, current.filter, viewer, projects));
+    },
+    createCustomView(input) {
+      const slugId = uniqueSlug(input.slugId ?? slugify(input.name, "view"), viewSlugs(views));
+      const created: CustomView = {
+        id: slugId,
+        slugId,
+        name: input.name.trim() || "Untitled view",
+        description: input.description ?? "",
+        modelName: "Issue",
+        shared: input.shared ?? false,
+        owner: viewer,
+        icon: input.icon ?? "issues",
+        grouping: input.grouping ?? "status",
+        layout: input.layout ?? "list",
+        filter: copyFilter(input.filter ?? {}),
+      };
+      views = [created, ...views];
+      return created;
     },
     createIssue(input) {
       const id = nextIdentifier(issues, teamKey);
@@ -378,21 +418,60 @@ function findProject(projects: Project[], id: string | undefined): Project | und
   return projects.find((item) => item.id === id || item.slugId === id);
 }
 
-function slugify(name: string): string {
+function slugify(name: string, fallback = "project"): string {
   const slug = name
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
-  return slug || "project";
+  return slug || fallback;
 }
 
-function uniqueSlug(base: string, projects: Project[]): string {
-  const taken = new Set(projects.flatMap((item) => [item.id, item.slugId]));
+function uniqueSlug(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base;
   let n = 2;
   while (taken.has(`${base}-${n}`)) n += 1;
   return `${base}-${n}`;
+}
+
+function projectSlugs(projects: Project[]): Set<string> {
+  return new Set(projects.flatMap((item) => [item.id, item.slugId]));
+}
+
+function viewSlugs(views: CustomView[]): Set<string> {
+  return new Set(views.flatMap((item) => [item.id, item.slugId]));
+}
+
+function findCustomView(views: CustomView[], id: string | undefined): CustomView | undefined {
+  if (!id) return undefined;
+  return views.find((item) => item.id === id || item.slugId === id);
+}
+
+function matchesViewFilter(
+  issue: Issue,
+  filter: CustomViewFilter,
+  viewer: string,
+  projects: Project[],
+): boolean {
+  if (filter.assignedToMe && issue.assignee !== viewer) return false;
+  if (filter.createdByMe && issue.creator !== viewer) return false;
+  if (filter.subscribed && !issue.subscribed) return false;
+  if (filter.statuses?.length && !filter.statuses.includes(issue.status)) return false;
+  if (filter.projectId) {
+    const project = findProject(projects, filter.projectId);
+    if (!project || issue.projectId !== project.id) return false;
+  }
+  if (filter.labels?.length && !filter.labels.some((label) => issue.labels.includes(label))) return false;
+  if (filter.priority !== undefined && issue.priority !== filter.priority) return false;
+  return true;
+}
+
+function copyFilter(filter: CustomViewFilter): CustomViewFilter {
+  return {
+    ...filter,
+    statuses: filter.statuses ? [...filter.statuses] : undefined,
+    labels: filter.labels ? [...filter.labels] : undefined,
+  };
 }
 
 function copyIssue(issue: Issue): Issue {
@@ -418,10 +497,6 @@ function copyProject(project: Project): Project {
 function copyView(view: CustomView): CustomView {
   return {
     ...view,
-    filter: {
-      ...view.filter,
-      statuses: view.filter.statuses ? [...view.filter.statuses] : undefined,
-      labels: view.filter.labels ? [...view.filter.labels] : undefined,
-    },
+    filter: copyFilter(view.filter),
   };
 }

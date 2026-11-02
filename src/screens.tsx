@@ -15,7 +15,7 @@ import {
   ViewsIcon,
 } from "./icons";
 import type { Progress } from "./kernel";
-import { HEALTH_LABEL, PRIORITY_LABEL, PROJECT_STATUS_LABEL, matchesView } from "./logic";
+import { HEALTH_LABEL, PRIORITY_LABEL, PROJECT_STATUS_LABEL } from "./logic";
 import type {
   Activity,
   CustomView,
@@ -79,32 +79,28 @@ export function ProjectList({
 
 export function ViewList({
   views,
-  issues,
-  viewer,
+  issueCount,
   onOpen,
 }: {
   views: CustomView[];
-  issues: Issue[];
-  viewer: string;
+  issueCount: (id: string) => number;
   onOpen: (id: string) => void;
 }) {
   return (
     <ul className="entity-list">
-      {views.map((view) => {
-        const count = issues.filter((issue) => matchesView(issue, view, viewer)).length;
-        return (
-          <li key={view.id}>
-            <button type="button" className="entity-row" onClick={() => onOpen(view.id)}>
-              {view.icon === "project" ? <CubeIcon /> : view.icon === "focus" ? <SparkIcon /> : <ViewsIcon />}
-              <span className="entity-title">{view.name}</span>
-              <span className="entity-meta">{view.description}</span>
-              <span className="chip">{view.shared ? "Shared" : "Private"}</span>
-              <span className="chip">{view.grouping}</span>
-              <span className="count">{count}</span>
-            </button>
-          </li>
-        );
-      })}
+      {views.map((view) => (
+        <li key={view.id}>
+          <button type="button" className="entity-row" onClick={() => onOpen(view.id)}>
+            {view.icon === "project" ? <CubeIcon /> : view.icon === "focus" ? <SparkIcon /> : <ViewsIcon />}
+            <span className="entity-title">{view.name}</span>
+            <span className="entity-meta">{view.description}</span>
+            <span className="chip">{view.shared ? "Shared" : "Private"}</span>
+            <span className="chip">{view.grouping}</span>
+            <span className="chip">{view.layout}</span>
+            <span className="count">{issueCount(view.id)}</span>
+          </button>
+        </li>
+      ))}
     </ul>
   );
 }

@@ -661,8 +661,25 @@ kbd {
   padding: 4px 0 48px;
 }
 
+.issue-list.board-layout {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 8px 12px 48px;
+}
+
+.issue-list.board-layout .issue-group {
+  flex: 0 0 280px;
+  margin-top: 0;
+}
+
 .issue-group + .issue-group {
   margin-top: 4px;
+}
+
+.issue-list.board-layout .issue-group + .issue-group {
+  margin-top: 0;
 }
 
 .group-head {

@@ -59,7 +59,6 @@ import {
   STATUSES,
   STATUS_LABEL,
   hashFor,
-  matchesView,
   nextProjectStatus,
   nextStatus,
   parseHash,
@@ -68,7 +67,6 @@ import {
 import { ProjectList, ProjectPage, ViewList } from "./screens";
 import type {
   Activity,
-  CustomView,
   Frame,
   InboxItem,
   Issue,
@@ -81,6 +79,7 @@ import type {
   Project,
   Review,
   StatusFilter,
+  ViewLayout,
 } from "./types";
 
 const TABS: { id: IssueTab; label: string }[] = [
@@ -179,7 +178,7 @@ export default function App() {
   const [issues, setIssues] = useState<Issue[]>(() => kernel.issues());
   const [projects, setProjects] = useState<Project[]>(() => kernel.projects());
   const [listGrouping, setListGrouping] = useState<IssueGrouping>("status");
-  const [views] = useState<CustomView[]>(seedViews);
+  const views = kernel.views();
   const [milestones] = useState(seedMilestones);
   const [initiatives] = useState(seedInitiatives);
   const [activity, setActivity] = useState<Activity[]>(seedActivity);
@@ -240,12 +239,12 @@ export default function App() {
   const chordTimer = useRef(0);
 
   const activeProject = projects.find((project) => project.id === projectId) ?? null;
-  const activeView = views.find((view) => view.id === viewId) ?? null;
+  const activeView = (viewId && kernel.getCustomView(viewId)) || null;
   const reviewDot = reviews.some((item) => !item.approved);
   const visible = useMemo(() => {
     let listed = kernel.issues();
     if (nav === "views" && activeView) {
-      listed = listed.filter((issue) => matchesView(issue, activeView, kernel.viewer));
+      listed = kernel.customViewIssues(activeView.id);
     } else if (nav === "projects" && activeProject) {
       listed = kernel.projectIssues(activeProject.id);
     } else if (nav === "team-issues") {
@@ -1064,6 +1063,7 @@ export default function App() {
                       : (
                           <>
                             {activeView ? <span className="chip">{activeView.grouping}</span> : null}
+                            {activeView ? <span className="chip">{activeView.layout}</span> : null}
                             {activeView ? <span className="chip">{activeView.shared ? "Shared" : "Private"}</span> : null}
                             {nav === "team-issues" ? <span className="chip">Team</span> : null}
                           </>
@@ -1203,7 +1203,7 @@ export default function App() {
                     }
                   />
                 ) : nav === "views" && !activeView ? (
-                  <ViewList views={views} issues={issues} viewer={kernel.viewer} onOpen={openView} />
+                  <ViewList views={views} issueCount={(id) => kernel.customViewIssues(id).length} onOpen={openView} />
                 ) : nav === "loops" || nav === "team-home" ? (
                   <EmptyState text={`${pageTitle} is a visual shell in this replica`} onCreate={() => openComposer()} />
                 ) : tab === "activity" && nav === "my-issues" ? (
@@ -1229,6 +1229,7 @@ export default function App() {
                 ) : (
                   <IssueList
                     groups={grouped}
+                    layout={activeView?.layout ?? "list"}
                     cursorId={cursorId}
                     issueId={issueId}
                     checkedIds={checkedIds}
@@ -1816,6 +1817,7 @@ function IssuePanel({
 
 function IssueList({
   groups,
+  layout = "list",
   cursorId,
   issueId,
   checkedIds,
@@ -1829,6 +1831,7 @@ function IssueList({
   onCreateIn,
 }: {
   groups: IssueGroup[];
+  layout?: ViewLayout;
   cursorId: string | null;
   issueId: string | null;
   checkedIds: string[];
@@ -1842,7 +1845,7 @@ function IssueList({
   onCreateIn: (status?: IssueStatus) => void;
 }) {
   return (
-    <ul className="issue-list">
+    <ul className={layout === "board" ? "issue-list board-layout" : "issue-list"}>
       {groups.map((group) => (
         <li key={group.key} className="issue-group">
           <div className="group-head">
