@@ -62,6 +62,7 @@ export type IssuePatch = {
   estimate?: number | null;
   parentId?: string | null;
   projectId?: string | null;
+  milestoneId?: string | null;
   labels?: string[];
   priority?: Priority;
 };
@@ -87,7 +88,16 @@ export type ProjectPatch = {
 
 export type UpdateIssueResult =
   | { ok: true; issue: Issue }
-  | { ok: false; error: "unknown-issue" | "self-parent" | "unknown-parent" | "unknown-project" };
+  | {
+      ok: false;
+      error:
+        | "unknown-issue"
+        | "self-parent"
+        | "unknown-parent"
+        | "unknown-project"
+        | "unknown-milestone"
+        | "invalid-milestone";
+    };
 
 export type Progress = {
   scope: number;
@@ -284,7 +294,10 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
       }
       const project = findProject(projects, input.projectId);
       if (project) created.projectId = project.id;
-      if (input.milestoneId) created.milestoneId = input.milestoneId;
+      const milestone = findMilestone(milestones, input.milestoneId);
+      if (milestone && created.projectId && milestone.projectId === created.projectId) {
+        created.milestoneId = milestone.id;
+      }
       issues = [created, ...issues];
       return created;
     },
@@ -295,12 +308,9 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
       if (patch.parentId && !issues.some((item) => item.id === patch.parentId)) {
         return { ok: false, error: "unknown-parent" };
       }
-      if (patch.projectId) {
-        const project = findProject(projects, patch.projectId);
-        if (!project) return { ok: false, error: "unknown-project" };
-        patch = { ...patch, projectId: project.id };
-      }
-      applyIssuePatch(current, patch);
+      const resolved = resolveIssuePatch(current, patch, projects, milestones);
+      if (!resolved.ok) return resolved;
+      applyIssuePatch(current, resolved.patch);
       issues = issues.slice();
       return { ok: true, issue: current };
     },
@@ -369,6 +379,40 @@ function nextIdentifier(issues: Issue[], teamKey: string): string {
   return `${prefix}${max + 1}`;
 }
 
+function resolveIssuePatch(
+  current: Issue,
+  patch: IssuePatch,
+  projects: Project[],
+  milestones: ProjectMilestone[],
+): { ok: true; patch: IssuePatch } | { ok: false; error: "unknown-project" | "unknown-milestone" | "invalid-milestone" } {
+  let projectId = current.projectId;
+  if (patch.projectId !== undefined) {
+    if (patch.projectId === null) {
+      projectId = undefined;
+    } else {
+      const project = findProject(projects, patch.projectId);
+      if (!project) return { ok: false, error: "unknown-project" };
+      projectId = project.id;
+      patch = { ...patch, projectId: project.id };
+    }
+  }
+
+  if (patch.milestoneId !== undefined) {
+    if (patch.milestoneId !== null) {
+      const milestone = findMilestone(milestones, patch.milestoneId);
+      if (!milestone) return { ok: false, error: "unknown-milestone" };
+      if (!projectId || milestone.projectId !== projectId) return { ok: false, error: "invalid-milestone" };
+    }
+  } else if (patch.projectId !== undefined && current.milestoneId) {
+    const milestone = findMilestone(milestones, current.milestoneId);
+    if (!milestone || !projectId || milestone.projectId !== projectId) {
+      patch = { ...patch, milestoneId: null };
+    }
+  }
+
+  return { ok: true, patch };
+}
+
 function applyIssuePatch(issue: Issue, patch: IssuePatch): void {
   if (patch.title !== undefined) issue.title = patch.title;
   if (patch.body !== undefined) issue.body = patch.body;
@@ -391,6 +435,10 @@ function applyIssuePatch(issue: Issue, patch: IssuePatch): void {
   if (patch.projectId !== undefined) {
     if (patch.projectId === null) delete issue.projectId;
     else issue.projectId = patch.projectId;
+  }
+  if (patch.milestoneId !== undefined) {
+    if (patch.milestoneId === null) delete issue.milestoneId;
+    else issue.milestoneId = patch.milestoneId;
   }
 }
 
@@ -416,6 +464,14 @@ function applyProjectPatch(project: Project, patch: ProjectPatch): void {
 function findProject(projects: Project[], id: string | undefined): Project | undefined {
   if (!id) return undefined;
   return projects.find((item) => item.id === id || item.slugId === id);
+}
+
+function findMilestone(
+  milestones: ProjectMilestone[],
+  id: string | undefined,
+): ProjectMilestone | undefined {
+  if (!id) return undefined;
+  return milestones.find((item) => item.id === id);
 }
 
 function slugify(name: string, fallback = "project"): string {

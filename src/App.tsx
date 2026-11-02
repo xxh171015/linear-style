@@ -704,12 +704,36 @@ export default function App() {
 
   function patchIssue(id: string, update: IssuePatch, activityText?: string) {
     const result = kernel.updateIssue(id, update);
-    if (!result.ok) return;
+    if (!result.ok) {
+      if (result.error === "invalid-milestone" || result.error === "unknown-milestone") {
+        flash("Milestone must belong to the Issue’s Project");
+      }
+      return;
+    }
     syncIssues();
     if (activityText) {
       log(id, activityText);
       notify(id, activityText);
     }
+  }
+
+  function cycleProject(id: string) {
+    const issue = kernel.getIssue(id);
+    if (!issue) return;
+    const ids: Array<string | null> = [null, ...kernel.projects().map((item) => item.id)];
+    const index = ids.indexOf(issue.projectId ?? null);
+    const next = ids[(index + 1) % ids.length] ?? null;
+    patchIssue(id, { projectId: next }, next ? "Added to project" : "Removed from project");
+  }
+
+  function cycleMilestone(id: string) {
+    const issue = kernel.getIssue(id);
+    if (!issue) return;
+    const owned = issue.projectId ? milestones.filter((item) => item.projectId === issue.projectId) : [];
+    const ids: Array<string | null> = [null, ...owned.map((item) => item.id)];
+    const index = ids.indexOf(issue.milestoneId ?? null);
+    const next = ids[(index + 1) % ids.length] ?? null;
+    patchIssue(id, { milestoneId: next }, next ? "Milestone updated" : "Milestone cleared");
   }
 
   function cycleStatus(id: string) {
@@ -1216,12 +1240,15 @@ export default function App() {
                   <IssuePage
                     issue={selected}
                     projectName={projects.find((project) => project.id === selected.projectId)?.name}
+                    milestoneName={milestones.find((item) => item.id === selected.milestoneId)?.name}
                     activity={activity.filter((item) => item.issueId === selected.id)}
                     comment={comment}
                     onComment={setComment}
                     onSubmitComment={() => addComment(selected.id)}
                     onCycle={() => cycleStatus(selected.id)}
                     onPriority={() => cyclePriority(selected.id)}
+                    onProject={() => cycleProject(selected.id)}
+                    onMilestone={() => cycleMilestone(selected.id)}
                     onTitle={(title) => patchIssue(selected.id, { title })}
                   />
                 ) : visible.length === 0 ? (
@@ -1258,6 +1285,8 @@ export default function App() {
             {panelOpen && selected && (nav === "my-issues" || nav === "team-issues") ? (
               <IssuePanel
                 issue={selected}
+                projectName={projects.find((project) => project.id === selected.projectId)?.name}
+                milestoneName={milestones.find((item) => item.id === selected.milestoneId)?.name}
                 activity={activity.filter((item) => item.issueId === selected.id)}
                 comment={comment}
                 onComment={setComment}
@@ -1274,6 +1303,8 @@ export default function App() {
                     "Priority updated",
                   )
                 }
+                onProject={() => cycleProject(selected.id)}
+                onMilestone={() => cycleMilestone(selected.id)}
                 onSubscribe={() =>
                   patchIssue(
                     selected.id,
@@ -1746,6 +1777,8 @@ function AgentPane({
 
 function IssuePanel({
   issue,
+  projectName,
+  milestoneName,
   activity,
   comment,
   onComment,
@@ -1753,10 +1786,14 @@ function IssuePanel({
   onClose,
   onCycle,
   onPriority,
+  onProject,
+  onMilestone,
   onSubscribe,
   onTitle,
 }: {
   issue: Issue;
+  projectName?: string;
+  milestoneName?: string;
   activity: Activity[];
   comment: string;
   onComment: (value: string) => void;
@@ -1764,6 +1801,8 @@ function IssuePanel({
   onClose: () => void;
   onCycle: () => void;
   onPriority: () => void;
+  onProject: () => void;
+  onMilestone: () => void;
   onSubscribe: () => void;
   onTitle: (value: string) => void;
 }) {
@@ -1793,6 +1832,14 @@ function IssuePanel({
         <button className="meta-btn" type="button" onClick={onSubscribe}>
           <BellIcon />
           {issue.subscribed ? "Subscribed" : "Subscribe"}
+        </button>
+        <button className="meta-btn" type="button" onClick={onProject}>
+          <CubeIcon />
+          {projectName ?? "Add to project"}
+        </button>
+        <button className="meta-btn" type="button" onClick={onMilestone}>
+          <CalendarIcon />
+          {milestoneName ?? "Add milestone"}
         </button>
       </div>
       <div className="panel-activity">
@@ -1930,22 +1977,28 @@ function IssueList({
 function IssuePage({
   issue,
   projectName,
+  milestoneName,
   activity,
   comment,
   onComment,
   onSubmitComment,
   onCycle,
   onPriority,
+  onProject,
+  onMilestone,
   onTitle,
 }: {
   issue: Issue;
   projectName?: string;
+  milestoneName?: string;
   activity: Activity[];
   comment: string;
   onComment: (value: string) => void;
   onSubmitComment: () => void;
   onCycle: () => void;
   onPriority: () => void;
+  onProject: () => void;
+  onMilestone: () => void;
   onTitle: (value: string) => void;
 }) {
   return (
@@ -1984,9 +2037,13 @@ function IssuePage({
           <PersonIcon />
           {issue.assignee ?? "Assign"}
         </button>
-        <button className="meta-btn" type="button">
+        <button className="meta-btn" type="button" onClick={onProject}>
           <CubeIcon />
           {projectName ?? "Add to project"}
+        </button>
+        <button className="meta-btn" type="button" onClick={onMilestone}>
+          <CalendarIcon />
+          {milestoneName ?? "Add milestone"}
         </button>
         <p className="props-label">Labels</p>
         <button className="meta-btn" type="button">

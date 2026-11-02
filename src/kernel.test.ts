@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { createKernel, ISSUE_GROUPINGS, ISSUE_STATUSES, PROJECT_STATUSES } from "./kernel";
-import type { CustomView, Issue, IssueGrouping, Project } from "./types";
+import type { CustomView, Issue, IssueGrouping, Project, ProjectMilestone } from "./types";
 
 const viewer = "Ada";
 const teamKey = "XXH";
@@ -52,8 +52,18 @@ function view(partial: Partial<CustomView> & Pick<CustomView, "id" | "name">): C
   };
 }
 
-function kernelWith(issues: Issue[], extra?: { projects?: Project[]; views?: CustomView[] }) {
-  return createKernel({ viewer, teamKey, issues, projects: extra?.projects, views: extra?.views });
+function kernelWith(
+  issues: Issue[],
+  extra?: { projects?: Project[]; views?: CustomView[]; milestones?: ProjectMilestone[] },
+) {
+  return createKernel({
+    viewer,
+    teamKey,
+    issues,
+    projects: extra?.projects,
+    views: extra?.views,
+    milestones: extra?.milestones,
+  });
 }
 
 describe("Issue identifier and create defaults", () => {
@@ -556,6 +566,83 @@ describe("Custom View saved query", () => {
       views: [view({ id: "feed", name: "Feed", modelName: "FeedItem" })],
     });
     expect(kernel.customViewIssues("feed")).toEqual([]);
+  });
+});
+
+describe("Milestone membership", () => {
+  const atlas = project({ id: "atlas", name: "Atlas" });
+  const helix = project({ id: "helix", name: "Helix" });
+  const ship = { id: "ms-ship", projectId: "atlas", name: "Ship", sortOrder: 1 };
+  const later = { id: "ms-later", projectId: "helix", name: "Later", sortOrder: 1 };
+
+  test("setting a Milestone is allowed only when it belongs to the Issue’s Project", () => {
+    const kernel = kernelWith([issue({ id: "XXH-1", title: "Work", projectId: "atlas" })], {
+      projects: [atlas, helix],
+      milestones: [ship, later],
+    });
+    expect(kernel.updateIssue("XXH-1", { milestoneId: "ms-ship" }).ok).toBe(true);
+    expect(kernel.getIssue("XXH-1")?.milestoneId).toBe("ms-ship");
+    const refused = kernel.updateIssue("XXH-1", { milestoneId: "ms-later" });
+    expect(refused.ok).toBe(false);
+    expect(kernel.getIssue("XXH-1")?.milestoneId).toBe("ms-ship");
+  });
+
+  test("setting a Milestone without a Project is refused and the record is unchanged", () => {
+    const kernel = kernelWith([issue({ id: "XXH-1", title: "Loose" })], {
+      projects: [atlas],
+      milestones: [ship],
+    });
+    const refused = kernel.updateIssue("XXH-1", { milestoneId: "ms-ship" });
+    expect(refused.ok).toBe(false);
+    expect(kernel.getIssue("XXH-1")?.projectId).toBeUndefined();
+    expect(kernel.getIssue("XXH-1")?.milestoneId).toBeUndefined();
+  });
+
+  test("leaving a Project clears the Milestone", () => {
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "Work", projectId: "atlas", milestoneId: "ms-ship" })],
+      { projects: [atlas], milestones: [ship] },
+    );
+    expect(kernel.updateIssue("XXH-1", { projectId: null }).ok).toBe(true);
+    expect(kernel.getIssue("XXH-1")?.projectId).toBeUndefined();
+    expect(kernel.getIssue("XXH-1")?.milestoneId).toBeUndefined();
+  });
+
+  test("a title change does not clear a Milestone", () => {
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "Work", projectId: "atlas", milestoneId: "ms-ship" })],
+      { projects: [atlas], milestones: [ship] },
+    );
+    expect(kernel.updateIssue("XXH-1", { title: "Renamed" }).ok).toBe(true);
+    expect(kernel.getIssue("XXH-1")?.milestoneId).toBe("ms-ship");
+  });
+
+  test("moving an Issue to another Project clears a Milestone that belongs only to the old Project", () => {
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "Work", projectId: "atlas", milestoneId: "ms-ship" })],
+      { projects: [atlas, helix], milestones: [ship, later] },
+    );
+    expect(kernel.updateIssue("XXH-1", { projectId: "helix" }).ok).toBe(true);
+    expect(kernel.getIssue("XXH-1")?.projectId).toBe("helix");
+    expect(kernel.getIssue("XXH-1")?.milestoneId).toBeUndefined();
+  });
+
+  test("a parent Issue does not force children into the same Project or Milestone", () => {
+    const kernel = kernelWith([], { projects: [atlas], milestones: [ship] });
+    const parent = kernel.createIssue({ title: "Parent", projectId: "atlas", milestoneId: "ms-ship" });
+    const child = kernel.createIssue({ title: "Child", parentId: parent.id });
+    expect(parent.projectId).toBe("atlas");
+    expect(parent.milestoneId).toBe("ms-ship");
+    expect(child.parentId).toBe(parent.id);
+    expect(child.projectId).toBeUndefined();
+    expect(child.milestoneId).toBeUndefined();
+  });
+
+  test("create does not attach a Milestone that the Issue’s Project does not own", () => {
+    const kernel = kernelWith([], { projects: [atlas], milestones: [ship] });
+    const loose = kernel.createIssue({ title: "Loose", milestoneId: "ms-ship" });
+    expect(loose.projectId).toBeUndefined();
+    expect(loose.milestoneId).toBeUndefined();
   });
 });
 
