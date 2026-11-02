@@ -1,5 +1,11 @@
 import { describe, expect, test } from "vitest";
-import { createKernel, ISSUE_GROUPINGS, ISSUE_STATUSES, PROJECT_STATUSES } from "./kernel";
+import {
+  createKernel,
+  explainViewFilter,
+  ISSUE_GROUPINGS,
+  ISSUE_STATUSES,
+  PROJECT_STATUSES,
+} from "./kernel";
 import type { CustomView, Issue, IssueGrouping, Project, ProjectMilestone } from "./types";
 
 const viewer = "Ada";
@@ -566,6 +572,61 @@ describe("Custom View saved query", () => {
       views: [view({ id: "feed", name: "Feed", modelName: "FeedItem" })],
     });
     expect(kernel.customViewIssues("feed")).toEqual([]);
+  });
+
+  test("an unset View filter on an empty Team explains unconstrained emptiness", () => {
+    expect(explainViewFilter({}, viewer, [])).toEqual({
+      title: "The team has no issues",
+      subline: "This view has no filter conditions.",
+      lines: [],
+    });
+  });
+
+  test("a constrained View filter explains each set condition when membership is empty", () => {
+    const explanation = explainViewFilter(
+      {
+        assignedToMe: true,
+        createdByMe: true,
+        subscribed: true,
+        statuses: ["todo", "progress"],
+        projectId: "atlas",
+        labels: ["Focus", "Debt"],
+        priority: 2,
+      },
+      viewer,
+      [atlas],
+    );
+    expect(explanation).toEqual({
+      title: "No issues match this view",
+      lines: [
+        "Assigned to you",
+        "Created by you",
+        "Subscribed by you",
+        "Status is Todo or In Progress",
+        "Project is Atlas",
+        "Label is Focus or Debt",
+        "Priority is High",
+      ],
+    });
+  });
+
+  test("labels-only and statuses-only filters each produce one explanation line", () => {
+    expect(explainViewFilter({ labels: ["Focus"] }, viewer, []).lines).toEqual(["Label is Focus"]);
+    expect(explainViewFilter({ statuses: ["done"] }, viewer, []).lines).toEqual(["Status is Done"]);
+  });
+
+  test("a Project filter uses the Project name when present and the stored slug when missing", () => {
+    expect(explainViewFilter({ projectId: "atlas" }, viewer, [atlas]).lines).toEqual([
+      "Project is Atlas",
+    ]);
+    expect(explainViewFilter({ projectId: "gone-slug" }, viewer, [atlas]).lines).toEqual([
+      "Project is gone-slug",
+    ]);
+  });
+
+  test("priority zero is explained as No priority, distinct from an unset priority field", () => {
+    expect(explainViewFilter({ priority: 0 }, viewer, []).lines).toEqual(["Priority is No priority"]);
+    expect(explainViewFilter({}, viewer, []).lines).toEqual([]);
   });
 });
 

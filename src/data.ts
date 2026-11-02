@@ -214,6 +214,20 @@ export const seedViews: CustomView[] = [
     filter: { labels: ["needs-spec"] },
     teamKey: TEAM_KEY,
   },
+  {
+    id: "empty-demo",
+    slugId: "empty-demo",
+    name: "Empty filter demo",
+    description: "Impossible View filter — shows why-empty copy (XXH-14)",
+    modelName: "Issue",
+    shared: false,
+    owner: CURRENT_USER,
+    icon: "issues",
+    grouping: "status",
+    layout: "board",
+    filter: { labels: ["wontfix"], statuses: ["canceled"], priority: 0 },
+    teamKey: TEAM_KEY,
+  },
 ];
 
 export const seedActivity: Activity[] = [

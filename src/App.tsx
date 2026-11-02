@@ -1,5 +1,13 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createKernel, ISSUE_GROUPINGS, type IssuePatch, type ProductKernel, type ProjectPatch } from "./kernel";
+import {
+  createKernel,
+  explainViewFilter,
+  ISSUE_GROUPINGS,
+  type IssuePatch,
+  type ProductKernel,
+  type ProjectPatch,
+  type ViewFilterExplanation,
+} from "./kernel";
 import {
   CURRENT_USER,
   TEAM_KEY,
@@ -1252,7 +1260,15 @@ export default function App() {
                     onTitle={(title) => patchIssue(selected.id, { title })}
                   />
                 ) : visible.length === 0 ? (
-                  <EmptyState text={EMPTY[tab]} onCreate={() => openComposer()} />
+                  nav === "views" &&
+                  activeView &&
+                  kernel.customViewIssues(activeView.id).length === 0 ? (
+                    <ViewFilterEmptyState
+                      explanation={explainViewFilter(activeView.filter, kernel.viewer, projects)}
+                    />
+                  ) : (
+                    <EmptyState text={EMPTY[tab]} onCreate={() => openComposer()} />
+                  )
                 ) : (
                   <IssueList
                     groups={grouped}
@@ -1637,6 +1653,23 @@ function EmptyState({ text, onCreate }: { text: string; onCreate: () => void }) 
       <button className="primary pill" type="button" onClick={onCreate}>
         Create new issue
       </button>
+    </div>
+  );
+}
+
+function ViewFilterEmptyState({ explanation }: { explanation: ViewFilterExplanation }) {
+  return (
+    <div className="empty">
+      <EmptyMark />
+      <p>{explanation.title}</p>
+      {explanation.subline ? <p className="empty-subline">{explanation.subline}</p> : null}
+      {explanation.lines.length > 0 ? (
+        <ul className="empty-lines">
+          {explanation.lines.map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }

@@ -124,6 +124,53 @@ export type CreateCustomViewInput = {
   icon?: CustomView["icon"];
 };
 
+export type ViewFilterExplanation = {
+  title: string;
+  subline?: string;
+  lines: string[];
+};
+
+/** Read-only English copy for an empty Custom View membership (View filter). */
+export function explainViewFilter(
+  filter: CustomViewFilter,
+  _viewer: string,
+  projects: Project[],
+): ViewFilterExplanation {
+  const lines = viewFilterConditionLines(filter, projects);
+  if (lines.length === 0) {
+    return {
+      title: "The team has no issues",
+      subline: "This view has no filter conditions.",
+      lines: [],
+    };
+  }
+  return {
+    title: "No issues match this view",
+    lines,
+  };
+}
+
+function viewFilterConditionLines(filter: CustomViewFilter, projects: Project[]): string[] {
+  const lines: string[] = [];
+  if (filter.assignedToMe) lines.push("Assigned to you");
+  if (filter.createdByMe) lines.push("Created by you");
+  if (filter.subscribed) lines.push("Subscribed by you");
+  if (filter.statuses?.length) {
+    lines.push(`Status is ${filter.statuses.map((status) => STATUS_LABEL[status]).join(" or ")}`);
+  }
+  if (filter.projectId) {
+    const project = findProject(projects, filter.projectId);
+    lines.push(`Project is ${project?.name ?? filter.projectId}`);
+  }
+  if (filter.labels?.length) {
+    lines.push(`Label is ${filter.labels.join(" or ")}`);
+  }
+  if (filter.priority !== undefined) {
+    lines.push(`Priority is ${PRIORITY_LABEL[filter.priority]}`);
+  }
+  return lines;
+}
+
 export type KernelSeed = {
   viewer?: string;
   teamKey?: string;
