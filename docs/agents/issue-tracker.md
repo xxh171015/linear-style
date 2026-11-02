@@ -196,6 +196,17 @@ Prefer `Done` / `Canceled` over `issue archive` (archive bypasses Linear's norma
 
 ### Parent / sub-issue
 
+`/to-spec` lives on the **parent**. `/to-tickets` creates **children** that Sandcastle executes. Do not close or rewrite the parent while splitting.
+
+| When                      | Parent                                                                                        | Children                                                                |
+| ------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Splitting (`/to-tickets`) | Keep open. Spec stays on the parent. Remove `ready-for-agent` so LIST does not grab the spec. | Create with `--parent`, `--label ready-for-agent`, `--state Backlog`.   |
+| Sandcastle CLOSE          | Do **not** close.                                                                             | Close the child that was implemented (`scripts/linear-close.sh XXH-n`). |
+| **Every child is Done**   | Set parent to **Done**. Spec remains readable on the Done issue.                              | Already Done.                                                           |
+| More slices still planned | Leave parent open, but **not in Triage** (use Backlog).                                       | New children as above.                                                  |
+
+Do not leave a finished spec in **Triage**: it looks unprocessed. Do not archive the parent to keep the spec; Done is enough.
+
 ```bash
 # At create time (AFK child: leave Triage)
 linear issue create --team XXH --title "Child slice" --parent XXH-5 \
@@ -206,6 +217,9 @@ linear issue create --team XXH --title "Child slice" --parent XXH-5 \
 # After the fact
 linear issue update XXH-12 --parent XXH-5 --no-input
 linear issue update XXH-12 --clear-parent --no-input
+
+# All children Done → close the spec parent (not Sandcastle's job)
+linear issue update XXH-13 --state Done --no-input
 ```
 
 ### Blocked-by / blocks / related

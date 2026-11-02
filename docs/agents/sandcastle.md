@@ -22,12 +22,14 @@ pnpm sandcastle
 1. Grill / to-spec / to-tickets (or triage) until Agent Brief exists.
 2. Label `ready-for-agent` (remove `needs-spec`) **and move out of Triage** (`--state Backlog`). Linear’s default for new `/to-tickets` children is Triage; without this, Sandcastle used to skip them. LIST now also includes Triage as a safety net. Optionally put in Cycle.
 3. Sandcastle LIST = `scripts/linear-list-ready.sh`.
-4. Agent implements → `RALPH:` commit → `scripts/linear-close.sh XXH-n`.
+4. Agent implements → `RALPH:` commit → `scripts/linear-close.sh XXH-n` (the **child**, never the spec parent).
+5. When **every** child is Done, a maintainer (or a later skill run) sets the parent Spec to **Done**. Sandcastle must not close the parent just because one child finished.
 
 ## Not Sandcastle’s job
 
 - Requirements interviewing (`grill-with-docs`)
 - Glossary / ADR authorship
 - Triage inbox governance
+- Closing spec parents after `/to-tickets` (see `docs/agents/issue-tracker.md` → Parent / sub-issue)
 
 Those stay Matt skills + Linear.
