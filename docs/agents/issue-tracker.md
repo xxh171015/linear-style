@@ -228,6 +228,8 @@ Create a **Linear** issue on team `XXH` (commands above). Do **not** open a GitH
 
 ## Sandcastle custom tracker (LIST / VIEW / CLOSE)
 
+See `docs/agents/sandcastle.md` for the AFK loop runbook (`pnpm sandcastle`).
+
 Sandcastle has no first-party Linear integration. Use `sandcastle init --issue-tracker custom`, then wire these non-interactive commands (MCP alone is insufficient).
 
 Wrapper scripts live under `scripts/` (optional but recommended):

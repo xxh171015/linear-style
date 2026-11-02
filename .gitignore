@@ -4,3 +4,6 @@ dist
 .DS_Store
 tsconfig*.tsbuildinfo
 .agents
+.sandcastle/.env
+.sandcastle/logs/
+.sandcastle/worktrees/

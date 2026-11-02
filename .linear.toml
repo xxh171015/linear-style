@@ -1,0 +1,4 @@
+workspace = "xuxinghua"
+team_id = "XXH"
+issue_create_assign_self = "never"
+issue_create_ask_project = false
