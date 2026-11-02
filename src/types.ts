@@ -37,15 +37,12 @@ export type Issue = {
   date: string;
   labels: string[];
   priority: Priority;
-  assigned: boolean;
-  created: boolean;
   subscribed: boolean;
   assignee?: string;
   creator?: string;
   teamKey: string;
   projectId?: string;
   milestoneId?: string;
-  cycleId?: string;
   estimate?: number;
   parentId?: string;
 };

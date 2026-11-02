@@ -78,16 +78,18 @@ export function ProjectList({
 export function ViewList({
   views,
   issues,
+  viewer,
   onOpen,
 }: {
   views: CustomView[];
   issues: Issue[];
+  viewer: string;
   onOpen: (id: string) => void;
 }) {
   return (
     <ul className="entity-list">
       {views.map((view) => {
-        const count = issues.filter((issue) => matchesView(issue, view)).length;
+        const count = issues.filter((issue) => matchesView(issue, view, viewer)).length;
         return (
           <li key={view.id}>
             <button type="button" className="entity-row" onClick={() => onOpen(view.id)}>

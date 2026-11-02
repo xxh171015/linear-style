@@ -1,27 +1,17 @@
+import { ISSUE_STATUSES, PROJECT_STATUSES } from "./kernel";
 import type {
   CustomView,
   Frame,
   Issue,
-  IssueGroup,
-  IssueGrouping,
   IssueStatus,
   IssueTab,
   NavId,
-  Project,
   ProjectMilestone,
   ProjectStatus,
   ProjectTab,
 } from "./types";
 
-export const STATUSES: IssueStatus[] = ["backlog", "todo", "progress", "done", "canceled"];
-
-export const STATUS_LABEL: Record<IssueStatus, string> = {
-  backlog: "Backlog",
-  todo: "Todo",
-  progress: "In Progress",
-  done: "Done",
-  canceled: "Canceled",
-};
+export { ISSUE_GROUPINGS, ISSUE_STATUSES as STATUSES, PRIORITY_LABEL, STATUS_LABEL } from "./kernel";
 
 /** Linear WorkflowState.type mapping used by grouping and progress. */
 export const WORKFLOW_TYPE: Record<IssueStatus, "backlog" | "unstarted" | "started" | "completed" | "canceled"> = {
@@ -41,8 +31,6 @@ export const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   canceled: "Canceled",
 };
 
-export const PRIORITY_LABEL = ["No priority", "Urgent", "High", "Medium", "Low"] as const;
-
 export const HEALTH_LABEL = {
   onTrack: "On track",
   atRisk: "At risk",
@@ -50,12 +38,11 @@ export const HEALTH_LABEL = {
 } as const;
 
 export function nextStatus(status: IssueStatus): IssueStatus {
-  return STATUSES[(STATUSES.indexOf(status) + 1) % STATUSES.length];
+  return ISSUE_STATUSES[(ISSUE_STATUSES.indexOf(status) + 1) % ISSUE_STATUSES.length];
 }
 
 export function nextProjectStatus(status: ProjectStatus): ProjectStatus {
-  const order: ProjectStatus[] = ["backlog", "planned", "started", "paused", "completed", "canceled"];
-  return order[(order.indexOf(status) + 1) % order.length];
+  return PROJECT_STATUSES[(PROJECT_STATUSES.indexOf(status) + 1) % PROJECT_STATUSES.length];
 }
 
 export function issueWeight(issue: Issue): number {
@@ -88,54 +75,17 @@ export function milestoneStats(milestone: ProjectMilestone, issues: Issue[]) {
   return { completed, total, percent };
 }
 
-export function matchesView(issue: Issue, view: CustomView): boolean {
+export function matchesView(issue: Issue, view: CustomView, viewer: string): boolean {
   if (view.modelName !== "Issue") return false;
   const filter = view.filter;
-  if (filter.assignedToMe && !issue.assigned) return false;
-  if (filter.createdByMe && !issue.created) return false;
+  if (filter.assignedToMe && issue.assignee !== viewer) return false;
+  if (filter.createdByMe && issue.creator !== viewer) return false;
   if (filter.subscribed && !issue.subscribed) return false;
   if (filter.statuses?.length && !filter.statuses.includes(issue.status)) return false;
   if (filter.projectId && issue.projectId !== filter.projectId) return false;
   if (filter.labels?.length && !filter.labels.some((label) => issue.labels.includes(label))) return false;
   if (filter.priority !== undefined && issue.priority !== filter.priority) return false;
   return true;
-}
-
-export function groupIssues(issues: Issue[], grouping: IssueGrouping, projects: Project[]): IssueGroup[] {
-  if (grouping === "none") {
-    return issues.length ? [{ key: "all", label: "Issues", items: issues }] : [];
-  }
-  if (grouping === "status") {
-    return STATUSES.map((status) => ({
-      key: status,
-      label: STATUS_LABEL[status],
-      status,
-      items: issues.filter((issue) => issue.status === status),
-    })).filter((group) => group.items.length > 0);
-  }
-  if (grouping === "priority") {
-    return ([1, 2, 3, 4, 0] as const)
-      .map((priority) => ({
-        key: `p${priority}`,
-        label: PRIORITY_LABEL[priority],
-        items: issues.filter((issue) => issue.priority === priority),
-      }))
-      .filter((group) => group.items.length > 0);
-  }
-  if (grouping === "assignee") {
-    const names = [...new Set(issues.map((issue) => issue.assignee ?? "No assignee"))];
-    return names.map((name) => ({
-      key: name,
-      label: name,
-      items: issues.filter((issue) => (issue.assignee ?? "No assignee") === name),
-    }));
-  }
-  const ids = [...new Set(issues.map((issue) => issue.projectId ?? "none"))];
-  return ids.map((id) => ({
-    key: id,
-    label: id === "none" ? "No project" : projects.find((project) => project.id === id)?.name ?? id,
-    items: issues.filter((issue) => (issue.projectId ?? "none") === id),
-  }));
 }
 
 export function emptyFrame(): Pick<Frame, "projectId" | "viewId" | "projectTab" | "issueId"> {

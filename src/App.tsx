@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createKernel, ISSUE_GROUPINGS, type IssuePatch, type ProductKernel } from "./kernel";
 import {
   CURRENT_USER,
   TEAM_KEY,
@@ -57,7 +58,6 @@ import {
 import {
   STATUSES,
   STATUS_LABEL,
-  groupIssues,
   hashFor,
   matchesView,
   nextProjectStatus,
@@ -73,6 +73,7 @@ import type {
   InboxItem,
   Issue,
   IssueGroup,
+  IssueGrouping,
   IssueStatus,
   IssueTab,
   NavId,
@@ -161,10 +162,22 @@ function nowStamp() {
 
 export default function App() {
   const boot = parseHash();
+  const kernelRef = useRef<ProductKernel | null>(null);
+  if (kernelRef.current === null) {
+    kernelRef.current = createKernel({
+      viewer: CURRENT_USER,
+      teamKey: TEAM_KEY,
+      issues: seedIssues,
+      projects: seedProjects,
+      views: seedViews,
+    });
+  }
+  const kernel = kernelRef.current;
   const [nav, setNav] = useState<NavId>(boot.nav);
   const [tab, setTab] = useState<IssueTab>(boot.tab);
-  const [issues, setIssues] = useState<Issue[]>(seedIssues);
+  const [issues, setIssues] = useState<Issue[]>(() => kernel.issues());
   const [projects, setProjects] = useState<Project[]>(seedProjects);
+  const [listGrouping, setListGrouping] = useState<IssueGrouping>("status");
   const [views] = useState<CustomView[]>(seedViews);
   const [milestones] = useState(seedMilestones);
   const [initiatives] = useState(seedInitiatives);
@@ -229,21 +242,24 @@ export default function App() {
   const activeView = views.find((view) => view.id === viewId) ?? null;
   const reviewDot = reviews.some((item) => !item.approved);
   const visible = useMemo(() => {
-    return issues.filter((issue) => {
-      if (nav === "views" && activeView) {
-        if (!matchesView(issue, activeView)) return false;
-      } else if (nav === "projects" && activeProject) {
-        if (issue.projectId !== activeProject.id) return false;
-      } else if (nav === "my-issues") {
-        if (tab === "assigned" && !issue.assigned) return false;
-        if (tab === "created" && !issue.created) return false;
-        if (tab === "subscribed" && !issue.subscribed) return false;
-      }
+    let listed = kernel.issues();
+    if (nav === "views" && activeView) {
+      listed = listed.filter((issue) => matchesView(issue, activeView, kernel.viewer));
+    } else if (nav === "projects" && activeProject) {
+      listed = listed.filter((issue) => issue.projectId === activeProject.id);
+    } else if (nav === "team-issues") {
+      listed = kernel.teamIssues();
+    } else if (nav === "my-issues") {
+      if (tab === "assigned") listed = kernel.myIssuesAssigned();
+      else if (tab === "created") listed = kernel.myIssuesCreated();
+      else if (tab === "subscribed") listed = kernel.myIssuesSubscribed();
+    }
+    return listed.filter((issue) => {
       if (filter !== "all" && issue.status !== filter) return false;
       if (!showCompleted && (issue.status === "done" || issue.status === "canceled")) return false;
       return true;
     });
-  }, [activeProject, activeView, filter, issues, nav, showCompleted, tab]);
+  }, [activeProject, activeView, filter, issues, kernel, nav, showCompleted, tab]);
 
   const selected = issues.find((issue) => issue.id === issueId) ?? null;
   const pageTitle =
@@ -252,8 +268,8 @@ export default function App() {
       : (activeProject?.name ?? activeView?.name ?? labelForNav(nav));
 
   const grouped = useMemo(
-    () => groupIssues(visible, activeView?.grouping ?? "status", projects),
-    [activeView, projects, visible],
+    () => kernel.groupIssues(visible, activeView?.grouping ?? listGrouping),
+    [activeView, kernel, listGrouping, visible],
   );
 
   const selectedIssue = cursorId ? issues.find((issue) => issue.id === cursorId) ?? null : null;
@@ -264,7 +280,7 @@ export default function App() {
     if (selectedIssue) {
       items.push(
         { id: "assign", title: "Assign to…", hint: "A", group: "Issue", run: () => flash("Assign to…") },
-        { id: "assign-me", title: "Assign to me", hint: "I", group: "Issue", run: () => patchIssue(selectedIssue.id, { assigned: true, assignee: workspace }, "Assigned to you") },
+        { id: "assign-me", title: "Assign to me", hint: "I", group: "Issue", run: () => patchIssue(selectedIssue.id, { assignee: kernel.viewer }, "Assigned to you") },
         { id: "status", title: "Change status…", hint: "S", group: "Issue", run: () => setListStatusOpen(true) },
         { id: "priority", title: "Set priority…", hint: "P", group: "Issue", run: () => cyclePriority(selectedIssue.id) },
         { id: "labels", title: "Add labels…", hint: "L", group: "Issue", run: () => flash("Labels") },
@@ -648,9 +664,10 @@ export default function App() {
   }
 
   function openIssue(id: string, record = true, peek = false) {
-    const issue = issues.find((item) => item.id === id);
+    const issue = kernel.getIssue(id);
     const nextNav: NavId = nav === "team-issues" ? "team-issues" : "my-issues";
-    const nextTab: IssueTab = issue?.assigned ? "assigned" : issue?.created ? "created" : "subscribed";
+    const nextTab: IssueTab =
+      issue?.assignee === kernel.viewer ? "assigned" : issue?.creator === kernel.viewer ? "created" : "subscribed";
     go({ nav: nextNav, tab: nav === "team-issues" ? tab : nextTab, issueId: id }, record);
     setInbox((current) => current.map((item) => (item.issueId === id ? { ...item, read: true } : item)));
     setPanelOpen(peek);
@@ -670,26 +687,22 @@ export default function App() {
     ]);
   }
 
+  function syncIssues() {
+    setIssues(kernel.issues());
+  }
+
   function createIssue() {
     const title = draftTitle.trim();
     if (!title) return;
-    const next: Issue = {
-      id: `XXH-${20 + issues.length}`,
+    const next = kernel.createIssue({
       title,
       body: draftBody.trim(),
       status: draftStatus,
       date: "Nov 2",
       labels: draftLabels,
-      priority: 0,
-      assigned: true,
-      created: true,
-      subscribed: true,
-      assignee: CURRENT_USER,
-      creator: CURRENT_USER,
-      teamKey: TEAM_KEY,
       projectId: draftProjectId ?? undefined,
-    };
-    setIssues((current) => [next, ...current]);
+    });
+    syncIssues();
     log(next.id, "You created this issue");
     notify(next.id, `${next.id} created`);
     if (createMore) {
@@ -705,8 +718,10 @@ export default function App() {
     flash("Issue created");
   }
 
-  function patchIssue(id: string, update: Partial<Issue>, activityText?: string) {
-    setIssues((current) => current.map((issue) => (issue.id === id ? { ...issue, ...update } : issue)));
+  function patchIssue(id: string, update: IssuePatch, activityText?: string) {
+    const result = kernel.updateIssue(id, update);
+    if (!result.ok) return;
+    syncIssues();
     if (activityText) {
       log(id, activityText);
       notify(id, activityText);
@@ -714,14 +729,14 @@ export default function App() {
   }
 
   function cycleStatus(id: string) {
-    const issue = issues.find((item) => item.id === id);
+    const issue = kernel.getIssue(id);
     if (!issue) return;
     const status = nextStatus(issue.status);
     patchIssue(id, { status }, `Status changed to ${STATUS_LABEL[status]}`);
   }
 
   function cyclePriority(id: string) {
-    const issue = issues.find((item) => item.id === id);
+    const issue = kernel.getIssue(id);
     if (!issue) return;
     const priority = ((issue.priority + 1) % 5) as Priority;
     patchIssue(id, { priority }, "Priority updated");
@@ -1103,6 +1118,21 @@ export default function App() {
                       </button>
                       {displayOpen ? (
                         <div className="menu">
+                          {!activeView
+                            ? ISSUE_GROUPINGS.map((grouping) => (
+                                <button
+                                  key={grouping}
+                                  className={listGrouping === grouping ? "menu-item active" : "menu-item"}
+                                  type="button"
+                                  onClick={() => {
+                                    setListGrouping(grouping);
+                                    setDisplayOpen(false);
+                                  }}
+                                >
+                                  Group by {grouping}
+                                </button>
+                              ))
+                            : null}
                           <button className="menu-item" type="button" onClick={() => setShowCompleted((value) => !value)}>
                             {showCompleted ? "Hide completed" : "Show completed"}
                           </button>
@@ -1180,7 +1210,7 @@ export default function App() {
                     }
                   />
                 ) : nav === "views" && !activeView ? (
-                  <ViewList views={views} issues={issues} onOpen={openView} />
+                  <ViewList views={views} issues={issues} viewer={kernel.viewer} onOpen={openView} />
                 ) : nav === "loops" || nav === "team-home" ? (
                   <EmptyState text={`${pageTitle} is a visual shell in this replica`} onCreate={() => openComposer()} />
                 ) : tab === "activity" && nav === "my-issues" ? (

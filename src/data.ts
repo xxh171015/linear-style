@@ -1,7 +1,7 @@
 import type { Activity, CustomView, InboxItem, Initiative, Issue, Project, ProjectMilestone, Review } from "./types";
 
 export const CURRENT_USER = "徐兴华";
-export const TEAM_KEY = "Xxh";
+export const TEAM_KEY = "XXH";
 
 export const seedMilestones: ProjectMilestone[] = [
   { id: "ms-research", projectId: "personal-cadence", name: "调研", targetDate: "Nov 9", sortOrder: 1 },
@@ -66,8 +66,6 @@ export const seedIssues: Issue[] = [
     date: "Oct 28",
     labels: ["Design"],
     priority: 2,
-    assigned: true,
-    created: false,
     subscribed: true,
     assignee: CURRENT_USER,
     creator: CURRENT_USER,
@@ -83,8 +81,6 @@ export const seedIssues: Issue[] = [
     date: "Nov 2",
     labels: ["Spike", "Focus"],
     priority: 2,
-    assigned: true,
-    created: true,
     subscribed: true,
     assignee: CURRENT_USER,
     creator: CURRENT_USER,
@@ -100,8 +96,6 @@ export const seedIssues: Issue[] = [
     date: "Nov 2",
     labels: ["needs-spec"],
     priority: 3,
-    assigned: false,
-    created: true,
     subscribed: true,
     creator: CURRENT_USER,
     teamKey: TEAM_KEY,
@@ -116,8 +110,6 @@ export const seedIssues: Issue[] = [
     date: "Oct 26",
     labels: [],
     priority: 3,
-    assigned: true,
-    created: true,
     subscribed: true,
     assignee: CURRENT_USER,
     creator: CURRENT_USER,
@@ -133,8 +125,6 @@ export const seedIssues: Issue[] = [
     date: "Nov 1",
     labels: ["Debt"],
     priority: 4,
-    assigned: false,
-    created: true,
     subscribed: false,
     creator: CURRENT_USER,
     teamKey: TEAM_KEY,
@@ -149,8 +139,6 @@ export const seedIssues: Issue[] = [
     date: "Nov 1",
     labels: ["Focus"],
     priority: 2,
-    assigned: true,
-    created: true,
     subscribed: true,
     assignee: CURRENT_USER,
     creator: CURRENT_USER,
@@ -166,8 +154,6 @@ export const seedIssues: Issue[] = [
     date: "Oct 21",
     labels: ["Docs"],
     priority: 0,
-    assigned: false,
-    created: true,
     subscribed: true,
     creator: CURRENT_USER,
     teamKey: TEAM_KEY,
@@ -182,8 +168,6 @@ export const seedIssues: Issue[] = [
     date: "Oct 18",
     labels: ["Design"],
     priority: 1,
-    assigned: false,
-    created: true,
     subscribed: false,
     creator: CURRENT_USER,
     teamKey: TEAM_KEY,
