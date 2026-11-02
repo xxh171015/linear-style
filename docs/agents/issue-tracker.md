@@ -302,6 +302,8 @@ RUN curl -LsSf https://github.com/schpet/linear-cli/releases/latest/download/lin
 ```bash
 LINEAR_API_KEY=
 LINEAR_TEAM_ID=XXH
+CURSOR_API_KEY=
+GH_TOKEN=
 ```
 
 ---
@@ -345,7 +347,8 @@ Prefer dedicated `linear issue *` subcommands over raw GraphQL whenever they cov
 
 ## GitHub ↔ Linear
 
-- Branch names: prefer Linear's suggested form (`xxh-11-…`) via `linear issue start XXH-11`.
+- Sandcastle AFK: named branch `sandcastle/linear-xxh-worker/<stamp>`, Matt `/pr` body, then `git push` + `gh pr create` (needs `GH_TOKEN` in `.sandcastle/.env`; sandbox cannot use host `gh` login or osxkeychain).
+- Interactive human: Linear's suggested branch (`xxh-11-…`) via `linear issue start XXH-11`, then `/pr` in Cursor.
 - PR body / commits: include `Fixes XXH-11` (or `Refs XXH-11`) so the Linear↔GitHub integration can close/link.
 - Do not file product specs as GitHub Issues for this repo.
 
