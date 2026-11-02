@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createKernel, ISSUE_GROUPINGS, ISSUE_STATUSES } from "./kernel";
+import { createKernel, ISSUE_GROUPINGS, ISSUE_STATUSES, PROJECT_STATUSES } from "./kernel";
 import type { CustomView, Issue, IssueGrouping, Project } from "./types";
 
 const viewer = "Ada";
@@ -274,6 +274,81 @@ describe("Grouping on built-in lists", () => {
     for (const grouping of ISSUE_GROUPINGS satisfies readonly IssueGrouping[]) {
       expect(kernel.groupIssues(kernel.teamIssues(), grouping).length).toBeGreaterThan(0);
     }
+  });
+});
+
+describe("Project Issues membership", () => {
+  const atlas = project({ id: "atlas", name: "Atlas" });
+  const helix = project({ id: "helix", name: "Helix" });
+
+  test("Project Issues is the Issues whose Project is that Project", () => {
+    const kernel = kernelWith(
+      [
+        issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" }),
+        issue({ id: "XXH-2", title: "Loose" }),
+        issue({ id: "XXH-3", title: "In Helix", projectId: "helix" }),
+      ],
+      { projects: [atlas, helix] },
+    );
+    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual(["XXH-1"]);
+    expect(kernel.teamIssues().map((item) => item.id)).toEqual(["XXH-1", "XXH-2", "XXH-3"]);
+  });
+
+  test("opening an Issue from Project Issues and from Team Issues is the same record", () => {
+    const kernel = kernelWith([issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" })], {
+      projects: [atlas],
+    });
+    const fromProject = kernel.projectIssues("atlas")[0];
+    const fromTeam = kernel.teamIssues()[0];
+    expect(fromProject).toBe(fromTeam);
+    expect(fromProject).toBe(kernel.getIssue("XXH-1"));
+  });
+
+  test("a new Project is identified by a slug and starts in backlog with empty planning fields", () => {
+    const created = createKernel({ viewer, teamKey }).createProject({ name: "Atlas" });
+    expect(created.slugId).toBe("atlas");
+    expect(created.id).toBe("atlas");
+    expect(created.status).toBe("backlog");
+    expect(created.lead).toBeUndefined();
+    expect(created.startDate).toBeUndefined();
+    expect(created.targetDate).toBeUndefined();
+    expect(created.updates).toEqual([]);
+    expect(created.health).toBeUndefined();
+  });
+
+  test("Project status is only backlog, planned, started, paused, completed, or canceled", () => {
+    expect(PROJECT_STATUSES).toEqual(["backlog", "planned", "started", "paused", "completed", "canceled"]);
+  });
+
+  test("an Issue belongs to at most one Project, and any Team Issue may join", () => {
+    const kernel = kernelWith([issue({ id: "XXH-1", title: "Move me" })], { projects: [atlas, helix] });
+    expect(kernel.updateIssue("XXH-1", { projectId: "atlas" }).ok).toBe(true);
+    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual(["XXH-1"]);
+    expect(kernel.updateIssue("XXH-1", { projectId: "helix" }).ok).toBe(true);
+    expect(kernel.getIssue("XXH-1")?.projectId).toBe("helix");
+    expect(kernel.projectIssues("atlas")).toEqual([]);
+    expect(kernel.updateIssue("XXH-1", { projectId: null }).ok).toBe(true);
+    expect(kernel.getIssue("XXH-1")?.projectId).toBeUndefined();
+  });
+
+  test("creating an Issue from a Project defaults that Project; lists do not force one", () => {
+    const kernel = kernelWith([], { projects: [atlas] });
+    const fromProject = kernel.createIssue({ title: "From project", projectId: "atlas" });
+    const fromList = kernel.createIssue({ title: "From list" });
+    expect(fromProject.projectId).toBe("atlas");
+    expect(fromList.projectId).toBeUndefined();
+    expect(kernel.projectIssues("atlas")).toEqual([fromProject]);
+  });
+
+  test("Project Issues is not stored as a Custom View", () => {
+    const kernel = kernelWith([issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" })], {
+      projects: [atlas],
+      views: [view({ id: "atlas-query", name: "Atlas query", filter: { projectId: "atlas" } })],
+    });
+    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual(["XXH-1"]);
+    expect(kernel.views()).toHaveLength(1);
+    expect(kernel.views()[0]?.id).toBe("atlas-query");
+    expect(kernel.getProject("atlas")?.id).not.toBe(kernel.views()[0]?.id);
   });
 });
 

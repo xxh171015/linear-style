@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { createKernel, ISSUE_GROUPINGS, type IssuePatch, type ProductKernel } from "./kernel";
+import { createKernel, ISSUE_GROUPINGS, type IssuePatch, type ProductKernel, type ProjectPatch } from "./kernel";
 import {
   CURRENT_USER,
   TEAM_KEY,
@@ -176,7 +176,7 @@ export default function App() {
   const [nav, setNav] = useState<NavId>(boot.nav);
   const [tab, setTab] = useState<IssueTab>(boot.tab);
   const [issues, setIssues] = useState<Issue[]>(() => kernel.issues());
-  const [projects, setProjects] = useState<Project[]>(seedProjects);
+  const [projects, setProjects] = useState<Project[]>(() => kernel.projects());
   const [listGrouping, setListGrouping] = useState<IssueGrouping>("status");
   const [views] = useState<CustomView[]>(seedViews);
   const [milestones] = useState(seedMilestones);
@@ -246,7 +246,7 @@ export default function App() {
     if (nav === "views" && activeView) {
       listed = listed.filter((issue) => matchesView(issue, activeView, kernel.viewer));
     } else if (nav === "projects" && activeProject) {
-      listed = listed.filter((issue) => issue.projectId === activeProject.id);
+      listed = kernel.projectIssues(activeProject.id);
     } else if (nav === "team-issues") {
       listed = kernel.teamIssues();
     } else if (nav === "my-issues") {
@@ -634,32 +634,16 @@ export default function App() {
     go({ nav: "views", viewId: id });
   }
 
-  function patchProject(id: string, update: Partial<Project>) {
-    setProjects((current) => current.map((project) => (project.id === id ? { ...project, ...update } : project)));
+  function patchProject(id: string, update: ProjectPatch) {
+    const result = kernel.updateProject(id, update);
+    if (!result.ok) return;
+    setProjects(kernel.projects());
   }
 
   function createProject() {
-    const id = `proj-${Date.now()}`;
-    const project: Project = {
-      id,
-      slugId: id,
-      name: "Untitled project",
-      description: "",
-      status: "planned",
-      priority: 0,
-      lead: CURRENT_USER,
-      memberIds: [CURRENT_USER],
-      teamKeys: [TEAM_KEY],
-      initiativeIds: [],
-      labels: [],
-      weekProgress: [],
-      nextFocus: [],
-      risks: "",
-      resources: [],
-      updates: [],
-    };
-    setProjects((current) => [project, ...current]);
-    go({ nav: "projects", projectId: id, projectTab: "overview" });
+    const project = kernel.createProject({ name: "Untitled project" });
+    setProjects(kernel.projects());
+    go({ nav: "projects", projectId: project.id, projectTab: "overview" });
     flash("Project created");
   }
 
@@ -1193,10 +1177,10 @@ export default function App() {
                 ) : nav === "projects" && activeProject ? (
                   <ProjectPage
                     project={activeProject}
-                    issues={issues}
+                    issues={kernel.projectIssues(activeProject.id)}
                     milestones={milestones}
                     initiatives={initiatives}
-                    activity={activity.filter((item) => issues.some((issue) => issue.id === item.issueId && issue.projectId === activeProject.id))}
+                    activity={activity.filter((item) => kernel.projectIssues(activeProject.id).some((issue) => issue.id === item.issueId))}
                     tab={projectTab}
                     onTab={(next) => go({ nav: "projects", projectId: activeProject.id, projectTab: next })}
                     onOpenIssue={openIssue}

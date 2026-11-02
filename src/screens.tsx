@@ -130,7 +130,7 @@ export function ProjectPage({
   onCycleStatus: () => void;
   onCyclePriority: () => void;
 }) {
-  const scoped = issues.filter((issue) => issue.projectId === project.id);
+  const scoped = issues;
   const progress = projectScope(scoped);
   const latest = project.updates[0];
   const linked = initiatives.filter((item) => project.initiativeIds.includes(item.id));
