@@ -21,8 +21,8 @@
   --sidebar-w: 244px;
   --titlebar-h: 40px;
   --weight-ui: 500;
-  --font-ui: "Inter Variable", "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-mono: "Berkeley Mono", "Berkeley Mono Variable", ui-monospace, monospace;
+  --font-ui: "Inter", "Inter Variable", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 * {
@@ -191,8 +191,18 @@ button {
   min-width: 0;
   overflow: hidden;
   text-align: left;
-  color: var(--text);
+  color: var(--text-muted);
   font-weight: 450;
+}
+
+.search:hover {
+  background: rgba(255, 255, 255, 0.055);
+  color: var(--text);
+}
+
+.search kbd {
+  margin-left: auto;
+  flex-shrink: 0;
 }
 
 .search kbd,
@@ -274,8 +284,28 @@ kbd {
   overflow: auto;
 }
 
-.nav::-webkit-scrollbar {
-  width: 0;
+.nav,
+.board-body {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.14) transparent;
+}
+
+.nav::-webkit-scrollbar,
+.board-body::-webkit-scrollbar {
+  width: 8px;
+}
+
+.nav::-webkit-scrollbar-thumb,
+.board-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.nav::-webkit-scrollbar-track,
+.board-body::-webkit-scrollbar-track {
+  background: transparent;
 }
 
 .nav-item,
@@ -745,12 +775,20 @@ kbd {
   background: #222324;
 }
 
+.issue:focus-visible {
+  outline: 2px solid var(--link);
+  outline-offset: -2px;
+}
+
 .issue-check {
   width: 14px;
   height: 14px;
+  display: grid;
+  place-items: center;
   border: 1px solid transparent;
   border-radius: 3px;
   opacity: 0;
+  color: #fff;
 }
 
 .issue:hover .issue-check,
@@ -837,6 +875,8 @@ kbd {
   white-space: nowrap;
   font-weight: 450;
   letter-spacing: -0.01em;
+  user-select: text;
+  cursor: text;
 }
 
 .issue-date,
@@ -1171,6 +1211,8 @@ kbd {
   justify-items: center;
   align-items: start;
   padding-top: 11vh;
+  background: rgba(0, 0, 0, 0.48);
+  animation: overlay-fade 120ms ease-out;
 }
 
 .cmdk {
@@ -1180,6 +1222,7 @@ kbd {
   border-radius: 12px;
   overflow: hidden;
   box-shadow: rgba(0, 0, 0, 0.45) 0 24px 64px, inset 0 0 0 1px rgba(255, 255, 255, 0.04);
+  animation: cmdk-enter 140ms ease-out;
 }
 
 .cmdk-context {
@@ -1278,18 +1321,58 @@ kbd {
   font-weight: 450;
 }
 
-.shortcuts-drawer {
+.shortcuts-layer {
   position: fixed;
+  inset: 0;
+  z-index: 26;
+  background: rgba(0, 0, 0, 0.42);
+  animation: overlay-fade 120ms ease-out;
+}
+
+.shortcuts-drawer {
+  position: absolute;
   top: 8px;
   right: 8px;
   bottom: 8px;
-  z-index: 26;
   width: min(380px, calc(100vw - 24px));
   background: #f5f5f6;
   color: #1b1b1d;
   border-radius: 12px;
   padding: 16px 16px 12px;
   overflow: auto;
+  box-shadow: rgba(0, 0, 0, 0.35) 0 16px 40px;
+  animation: shortcuts-enter 160ms ease-out;
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cmdk-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes shortcuts-enter {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 .shortcuts-head {
@@ -1424,6 +1507,7 @@ kbd {
   font-weight: 600;
   letter-spacing: -0.02em;
   margin-bottom: 10px;
+  user-select: text;
 }
 
 .panel-body {
@@ -1431,6 +1515,8 @@ kbd {
   font-weight: 450;
   line-height: 1.45;
   margin-bottom: 16px;
+  user-select: text;
+  cursor: text;
 }
 
 .panel-meta {
@@ -1730,6 +1816,7 @@ kbd {
 
 .md-block {
   margin-bottom: 24px;
+  user-select: text;
 }
 
 .md-block h3 {

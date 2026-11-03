@@ -16,6 +16,10 @@ _Avoid_: WorkflowState, state, status category
 The home of Issues. This replica has one, treated as environment, not a thing the user switches.
 _Avoid_: Workspace, organization (for this role)
 
+**Workspace (Linear chrome)**:
+The sidebar switcher and “Workspace” nav section label in the product shell. Linear UI chrome only—not a second org entity and not a synonym for Team in domain language.
+_Avoid_: treating Workspace as the home of Issues; using Workspace in kernel/API names for Team
+
 **Estimate**:
 Optional size of an Issue in points. Absent means unestimated, not zero.
 
