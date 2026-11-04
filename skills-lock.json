@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "afk-setup": {
+      "source": "xxh171015/afk-platform",
+      "sourceType": "github",
+      "skillPath": "skills/afk-setup/SKILL.md",
+      "computedHash": "697fea961fe0ad826a0a4577641eeb50a87e1979d35fc32362e43f521c22fb47"
+    },
     "ask-matt": {
       "source": "mattpocock/skills",
       "sourceType": "github",
@@ -26,10 +32,10 @@
       "computedHash": "ede7254edbd22fcab97a0941511f7d440d8f9a249348fea97c50987ad5501674"
     },
     "domain-modeling": {
-      "source": "mattpocock/skills",
+      "source": "xxh171015/afk-platform",
       "sourceType": "github",
-      "skillPath": "skills/engineering/domain-modeling/SKILL.md",
-      "computedHash": "b3eb40152b81f0c98fd2095a023c019452dbdce56f7540cc67fece2972db8369"
+      "skillPath": "skills/domain-modeling/SKILL.md",
+      "computedHash": "2ec7bec3c1ce6d2d29c77a999e9da371416c97af0fda6a0a6d30ca51a85073c1"
     },
     "grill-me": {
       "source": "mattpocock/skills",
@@ -38,16 +44,16 @@
       "computedHash": "9cdbb4b8f7a3aeaef82e6230c9e823500d4a8a1214c726cf342cf9829d34fc7d"
     },
     "grill-with-docs": {
-      "source": "mattpocock/skills",
+      "source": "xxh171015/afk-platform",
       "sourceType": "github",
-      "skillPath": "skills/engineering/grill-with-docs/SKILL.md",
-      "computedHash": "35e62aa423aaeab6a414bcac273f56dfb17802ef2334b41b6a3b00f28196c8cf"
+      "skillPath": "skills/grill-with-docs/SKILL.md",
+      "computedHash": "967a9d7927558c9f0ffce8e02e56a82ac404c1f16b9c1d8b38beb52eb1ad52a3"
     },
     "grilling": {
-      "source": "mattpocock/skills",
+      "source": "xxh171015/afk-platform",
       "sourceType": "github",
-      "skillPath": "skills/productivity/grilling/SKILL.md",
-      "computedHash": "e40cc1d348f6d935e28f1e24474302d7368f0a400429271a43b35fe154891dc5"
+      "skillPath": "skills/grilling/SKILL.md",
+      "computedHash": "a0d60a142e423d74bb7d921f5179db07c00e675bc928cd530066ce615bbc84b8"
     },
     "handoff": {
       "source": "mattpocock/skills",
@@ -122,16 +128,16 @@
       "computedHash": "befbec7005695163741a57bc94810dc5048fb766baaa485d5160b1d7f86335c1"
     },
     "to-spec": {
-      "source": "mattpocock/skills",
+      "source": "xxh171015/afk-platform",
       "sourceType": "github",
-      "skillPath": "skills/engineering/to-spec/SKILL.md",
-      "computedHash": "3fa1a0695d4ea242fae9e569e4d22aa1788623197abb33bfadafae7315789bbf"
+      "skillPath": "skills/to-spec/SKILL.md",
+      "computedHash": "ea0ed3787d467f30889a640514c6a1f30b94e70ae03e5526c064eee108546258"
     },
     "to-tickets": {
-      "source": "mattpocock/skills",
+      "source": "xxh171015/afk-platform",
       "sourceType": "github",
-      "skillPath": "skills/engineering/to-tickets/SKILL.md",
-      "computedHash": "5f871bdc46a9212222214ba399be4965374208af1bd7f48f1271bef72841dd31"
+      "skillPath": "skills/to-tickets/SKILL.md",
+      "computedHash": "1d374ce67acd26539cc9d06679dfb19add69141307c9c0b68bef91949de7c569"
     },
     "triage": {
       "source": "mattpocock/skills",
