@@ -4,13 +4,13 @@ export const CURRENT_USER = "徐兴华";
 export const TEAM_KEY = "XXH";
 
 export const seedMilestones: ProjectMilestone[] = [
-  { id: "ms-research", projectId: "personal-cadence", name: "调研", targetDate: "Nov 9", sortOrder: 1 },
-  { id: "ms-demo", projectId: "personal-cadence", name: "可演示", targetDate: "Nov 30", sortOrder: 2 },
+  { id: "ms-research", projectId: "personal-cadence", name: "Research", targetDate: "Nov 9", sortOrder: 1 },
+  { id: "ms-demo", projectId: "personal-cadence", name: "Demo-ready", targetDate: "Nov 30", sortOrder: 2 },
   { id: "ms-mvp", projectId: "personal-cadence", name: "MVP", targetDate: "Nov 16", sortOrder: 3 },
 ];
 
 export const seedInitiatives: Initiative[] = [
-  { id: "init-q4", name: "2026 Q4 个人交付能力", status: "active" },
+  { id: "init-q4", name: "2026 Q4 personal delivery", status: "active" },
 ];
 
 export const seedProjects: Project[] = [
@@ -18,7 +18,7 @@ export const seedProjects: Project[] = [
     id: "personal-cadence",
     slugId: "personal-cadence",
     name: "个人研发节奏试用",
-    description: "用 Linear 跑通个人研发节奏：Cycle 聚焦、Triage 入口、Project 交付、Initiative 对齐。",
+    description: "Run personal engineering cadence on Linear: Cycle focus, Triage intake, Project delivery, Initiative alignment.",
     status: "started",
     priority: 2,
     lead: CURRENT_USER,
@@ -30,25 +30,25 @@ export const seedProjects: Project[] = [
     targetDate: "Nov 30",
     slackChannel: "Xxh",
     weekProgress: [
-      "建好 Project「个人研发节奏试用」与三个 Milestone：调研 / MVP / 可演示",
-      "样例 Issue 已就位（Focus / Spike / Debt / needs-spec）",
-      "标签约定：Focus、Spike、Debt、needs-spec",
+      "Created Project “个人研发节奏试用” with milestones Research / MVP / Demo-ready",
+      "Sample Issues are in place (Focus / Spike / Debt / needs-spec)",
+      "Label convention: Focus, Spike, Debt, needs-spec",
     ],
     nextFocus: [
-      "开启团队 Cycle（1 周）并把 Focus Issue 放进当前 Cycle",
-      "开启 Triage，用 XXH-10【样例】接入某新模型做周报摘要，演示 needs-spec 入口治理",
-      "创建 Initiative「2026 Q4 个人交付能力」并挂上本 Project",
+      "Start a one-week Team Cycle and put Focus Issues into the current Cycle",
+      "Enable Triage and use XXH-10 to demo needs-spec intake governance",
+      "Create Initiative “2026 Q4 personal delivery” and attach this Project",
     ],
-    risks: "Cycle / Triage / Initiative 需在团队与工作区设置里开启；API 侧无法直接开关。",
+    risks: "Cycle, Triage, and Initiative must be enabled in team/workspace settings; the API cannot toggle them.",
     resources: [
-      { id: "res-git", title: "Git Issue↔PR 闭环说明" },
-      { id: "res-loop", title: "Loop 基线：周一 Cycle 风险摘要" },
+      { id: "res-git", title: "Git Issue↔PR loop notes" },
+      { id: "res-loop", title: "Loop baseline: Monday Cycle risk summary" },
     ],
     updates: [
       {
         id: "upd-1",
         health: "onTrack",
-        body: "节奏骨架已搭好。下一步把 Focus issue 放进 Cycle，并用 XXH-10 演示 needs-spec 入口。",
+        body: "Cadence skeleton is up. Next: put Focus issues into Cycle and demo needs-spec intake with XXH-10.",
         author: CURRENT_USER,
         time: "15min ago",
       },
@@ -235,7 +235,7 @@ export const seedActivity: Activity[] = [
   { id: "a2", issueId: "XXH-9", text: "You were assigned", time: "1d" },
   { id: "a3", issueId: "XXH-4", text: "You marked this Done", time: "4d" },
   { id: "a4", issueId: "XXH-10", text: "You added label needs-spec", time: "15m" },
-  { id: "a5", issueId: "XXH-7", text: "You added this to 调研", time: "20m" },
+  { id: "a5", issueId: "XXH-7", text: "You added this to Research", time: "20m" },
 ];
 
 export const seedInbox: InboxItem[] = [

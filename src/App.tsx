@@ -67,10 +67,13 @@ import {
   STATUSES,
   STATUS_LABEL,
   hashFor,
+  isSidebarNavActive,
   nextProjectStatus,
   nextStatus,
   parseHash,
   toFrame,
+  type ProjectsViewsSection,
+  type SidebarNavSection,
 } from "./logic";
 import { ProjectList, ProjectPage, ViewList } from "./screens";
 import type {
@@ -223,6 +226,7 @@ export default function App() {
   const [showPriority, setShowPriority] = useState(true);
   const [panelOpen, setPanelOpen] = useState(false);
   const [workspace, setWorkspace] = useState("xxh");
+  const [projectsViewsSection, setProjectsViewsSection] = useState<ProjectsViewsSection>("workspace");
   const [sections, setSections] = useState({ workspace: true, teams: true, try: true, team: true });
   const [history, setHistory] = useState<Frame[]>([
     toFrame({
@@ -578,6 +582,13 @@ export default function App() {
     setToast(message);
   }
 
+  function selectSidebarNav(id: NavId, section: SidebarNavSection, extras: Partial<Frame> = {}) {
+    if ((id === "projects" || id === "views") && (section === "workspace" || section === "team")) {
+      setProjectsViewsSection(section);
+    }
+    go({ nav: id, ...extras });
+  }
+
   function go(partial: Partial<Frame> & { nav: NavId }, record = true) {
     const frame = toFrame(partial, partial.tab ?? tab);
     setNav(frame.nav);
@@ -818,9 +829,10 @@ export default function App() {
               <ForwardIcon />
             </button>
           </div>
-          <button className="search" type="button" onClick={() => setCommandOpen(true)}>
-            <IssuesIcon />
-            <span>{pageTitle}</span>
+          <button className="search" type="button" aria-label="Search" onClick={() => setCommandOpen(true)}>
+            <SearchIcon />
+            <span>Search…</span>
+            <kbd>⌘K</kbd>
           </button>
           <button className="tb-icon" type="button" aria-label="New issue" onClick={() => openComposer()}>
             <PlusIcon />
@@ -839,7 +851,7 @@ export default function App() {
                 setWorkspaceOpen((open) => !open);
               }}
             >
-              <span className="avatar">{workspace.slice(0, 2)}</span>
+              <span className="avatar">{workspace.slice(0, 2).toUpperCase()}</span>
               {workspace}
               <ChevronDownIcon />
             </button>
@@ -874,21 +886,41 @@ export default function App() {
           <nav className="nav">
             <NavButton
               id="inbox"
+              section="top"
               current={nav}
-              onSelect={(id) => go({ nav: id })}
+              projectsViewsSection={projectsViewsSection}
+              onSelect={(id) => selectSidebarNav(id, "top")}
               icon={<InboxIcon />}
               label="Inbox"
             />
-            <NavButton id="my-issues" current={nav} onSelect={(id) => go({ nav: id, tab: "assigned" })} icon={<IssuesIcon />} label="My issues" />
+            <NavButton
+              id="my-issues"
+              section="top"
+              current={nav}
+              projectsViewsSection={projectsViewsSection}
+              onSelect={(id) => selectSidebarNav(id, "top", { tab: "assigned" })}
+              icon={<IssuesIcon />}
+              label="My issues"
+            />
             <NavButton
               id="reviews"
+              section="top"
               current={nav}
-              onSelect={(id) => go({ nav: id })}
+              projectsViewsSection={projectsViewsSection}
+              onSelect={(id) => selectSidebarNav(id, "top")}
               icon={<ReviewsIcon />}
               label="Reviews"
               trailing={reviewDot ? <span className="dot" /> : null}
             />
-            <NavButton id="agent" current={nav} onSelect={(id) => go({ nav: id })} icon={<AgentIcon />} label="Agent" />
+            <NavButton
+              id="agent"
+              section="top"
+              current={nav}
+              projectsViewsSection={projectsViewsSection}
+              onSelect={(id) => selectSidebarNav(id, "top")}
+              icon={<AgentIcon />}
+              label="Agent"
+            />
 
             <div className={sections.workspace ? "section" : "section collapsed"}>
               <button
@@ -901,9 +933,33 @@ export default function App() {
               </button>
               {sections.workspace ? (
                 <>
-                  <NavButton id="projects" current={nav} onSelect={(id) => go({ nav: id })} icon={<CubeIcon />} label="Projects" />
-                  <NavButton id="views" current={nav} onSelect={(id) => go({ nav: id })} icon={<ViewsIcon />} label="Views" />
-                  <NavButton id="loops" current={nav} onSelect={(id) => go({ nav: id })} icon={<LoopsIcon />} label="Loops" />
+                  <NavButton
+                    id="projects"
+                    section="workspace"
+                    current={nav}
+                    projectsViewsSection={projectsViewsSection}
+                    onSelect={(id) => selectSidebarNav(id, "workspace")}
+                    icon={<CubeIcon />}
+                    label="Projects"
+                  />
+                  <NavButton
+                    id="views"
+                    section="workspace"
+                    current={nav}
+                    projectsViewsSection={projectsViewsSection}
+                    onSelect={(id) => selectSidebarNav(id, "workspace")}
+                    icon={<ViewsIcon />}
+                    label="Views"
+                  />
+                  <NavButton
+                    id="loops"
+                    section="workspace"
+                    current={nav}
+                    projectsViewsSection={projectsViewsSection}
+                    onSelect={(id) => selectSidebarNav(id, "workspace")}
+                    icon={<LoopsIcon />}
+                    label="Loops"
+                  />
                   <div className="more-wrap">
                     <button
                       className={moreOpen ? "nav-item active" : "nav-item"}
@@ -975,10 +1031,46 @@ export default function App() {
                   </button>
                   {sections.team ? (
                     <>
-                      <NavButton id="team-home" current={nav} onSelect={(id) => go({ nav: id })} icon={<HomeIcon />} label="Home" indent />
-                      <NavButton id="team-issues" current={nav} onSelect={(id) => go({ nav: id, tab: "assigned" })} icon={<IssuesIcon />} label="Issues" indent />
-                      <NavButton id="projects" current={nav} onSelect={(id) => go({ nav: id })} icon={<CubeIcon />} label="Projects" indent />
-                      <NavButton id="views" current={nav} onSelect={(id) => go({ nav: id })} icon={<ViewsIcon />} label="Views" indent />
+                      <NavButton
+                        id="team-home"
+                        section="team"
+                        current={nav}
+                        projectsViewsSection={projectsViewsSection}
+                        onSelect={(id) => selectSidebarNav(id, "team")}
+                        icon={<HomeIcon />}
+                        label="Home"
+                        indent
+                      />
+                      <NavButton
+                        id="team-issues"
+                        section="team"
+                        current={nav}
+                        projectsViewsSection={projectsViewsSection}
+                        onSelect={(id) => selectSidebarNav(id, "team", { tab: "assigned" })}
+                        icon={<IssuesIcon />}
+                        label="Issues"
+                        indent
+                      />
+                      <NavButton
+                        id="projects"
+                        section="team"
+                        current={nav}
+                        projectsViewsSection={projectsViewsSection}
+                        onSelect={(id) => selectSidebarNav(id, "team")}
+                        icon={<CubeIcon />}
+                        label="Projects"
+                        indent
+                      />
+                      <NavButton
+                        id="views"
+                        section="team"
+                        current={nav}
+                        projectsViewsSection={projectsViewsSection}
+                        onSelect={(id) => selectSidebarNav(id, "team")}
+                        icon={<ViewsIcon />}
+                        label="Views"
+                        indent
+                      />
                     </>
                   ) : null}
                 </>
@@ -1361,7 +1453,7 @@ export default function App() {
                   }}
                 >
                   <div className="composer-crumb">
-                    <span className="avatar">XX</span>
+                    <span className="avatar">{workspace.slice(0, 2).toUpperCase()}</span>
                     <span>{workspace}</span>
                     <span aria-hidden="true">›</span>
                     {draftProjectId ? (
@@ -1571,43 +1663,45 @@ export default function App() {
       ) : null}
 
       {shortcutsOpen ? (
-        <aside className="shortcuts-drawer" onClick={(event) => event.stopPropagation()}>
-          <div className="shortcuts-head">
-            <h2>Keyboard Shortcuts</h2>
-            <button className="composer-ghost" type="button" aria-label="Close shortcuts" onClick={() => setShortcutsOpen(false)}>
-              <CloseIcon />
-            </button>
-          </div>
-          <div className="shortcuts-search">
-            <SearchIcon />
-            <input
-              ref={shortcutRef}
-              value={shortcutQuery}
-              onChange={(event) => setShortcutQuery(event.target.value)}
-              placeholder="Search shortcuts"
-            />
-          </div>
-          <div className="shortcuts-body">
-            {SHORTCUT_GROUPS.map((group) => {
-              const items = group.items.filter((item) => {
-                const q = shortcutQuery.trim().toLowerCase();
-                return !q || item.label.toLowerCase().includes(q) || item.keys.toLowerCase().includes(q);
-              });
-              if (!items.length) return null;
-              return (
-                <section key={group.group}>
-                  <h3>{group.group}</h3>
-                  {items.map((item) => (
-                    <div className="shortcut-row" key={item.label}>
-                      <span>{item.label}</span>
-                      <kbd>{item.keys}</kbd>
-                    </div>
-                  ))}
-                </section>
-              );
-            })}
-          </div>
-        </aside>
+        <div className="shortcuts-layer" onClick={() => setShortcutsOpen(false)}>
+          <aside className="shortcuts-drawer" onClick={(event) => event.stopPropagation()}>
+            <div className="shortcuts-head">
+              <h2>Keyboard Shortcuts</h2>
+              <button className="composer-ghost" type="button" aria-label="Close shortcuts" onClick={() => setShortcutsOpen(false)}>
+                <CloseIcon />
+              </button>
+            </div>
+            <div className="shortcuts-search">
+              <SearchIcon />
+              <input
+                ref={shortcutRef}
+                value={shortcutQuery}
+                onChange={(event) => setShortcutQuery(event.target.value)}
+                placeholder="Search shortcuts"
+              />
+            </div>
+            <div className="shortcuts-body">
+              {SHORTCUT_GROUPS.map((group) => {
+                const items = group.items.filter((item) => {
+                  const q = shortcutQuery.trim().toLowerCase();
+                  return !q || item.label.toLowerCase().includes(q) || item.keys.toLowerCase().includes(q);
+                });
+                if (!items.length) return null;
+                return (
+                  <section key={group.group}>
+                    <h3>{group.group}</h3>
+                    {items.map((item) => (
+                      <div className="shortcut-row" key={item.label}>
+                        <span>{item.label}</span>
+                        <kbd>{item.keys}</kbd>
+                      </div>
+                    ))}
+                  </section>
+                );
+              })}
+            </div>
+          </aside>
+        </div>
       ) : null}
 
       {toast ? <div className="toast">{toast}</div> : null}
@@ -1617,7 +1711,9 @@ export default function App() {
 
 function NavButton({
   id,
+  section,
   current,
+  projectsViewsSection,
   onSelect,
   icon,
   label,
@@ -1625,17 +1721,20 @@ function NavButton({
   indent,
 }: {
   id: NavId;
+  section: SidebarNavSection;
   current: NavId;
+  projectsViewsSection: ProjectsViewsSection;
   onSelect: (id: NavId) => void;
   icon: ReactNode;
   label: string;
   trailing?: ReactNode;
   indent?: boolean;
 }) {
+  const active = isSidebarNavActive(id, section, current, projectsViewsSection);
   return (
     <button
       type="button"
-      className={`${current === id ? "nav-item active" : "nav-item"}${indent ? " indent" : ""}`}
+      className={`${active ? "nav-item active" : "nav-item"}${indent ? " indent" : ""}`}
       onClick={() => onSelect(id)}
     >
       {icon}
@@ -1958,7 +2057,9 @@ function IssueList({
                     event.stopPropagation();
                     onSelect(issue.id);
                   }}
-                />
+                >
+                  {checkedIds.includes(issue.id) ? <CheckTinyIcon /> : null}
+                </button>
                 <span className="issue-grip"><GripIcon /></span>
                 <span className="issue-id">{issue.id}</span>
                 <button

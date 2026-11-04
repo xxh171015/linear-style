@@ -131,3 +131,22 @@ export function toFrame(partial: Partial<Frame> & { nav: NavId }, fallbackTab: I
     projectTab: partial.projectTab ?? "overview",
   };
 }
+
+/** Which sidebar block owns the active Projects/Views highlight (rows are duplicated). */
+export type ProjectsViewsSection = "workspace" | "team";
+
+export type SidebarNavSection = "top" | "workspace" | "team";
+
+/** Only one Projects or Views row is active; other nav ids ignore the section. */
+export function isSidebarNavActive(
+  rowId: NavId,
+  rowSection: SidebarNavSection,
+  currentNav: NavId,
+  projectsViewsSection: ProjectsViewsSection,
+): boolean {
+  if (rowId !== currentNav) return false;
+  if (rowId === "projects" || rowId === "views") {
+    return rowSection === projectsViewsSection;
+  }
+  return true;
+}

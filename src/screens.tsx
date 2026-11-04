@@ -216,7 +216,7 @@ export function ProjectPage({
             ) : null}
 
             <section className="md-block">
-              <h3>本周进展</h3>
+              <h3>Progress this week</h3>
               <ul>
                 {project.weekProgress.map((item) => (
                   <li key={item}>{item}</li>
@@ -224,7 +224,7 @@ export function ProjectPage({
               </ul>
             </section>
             <section className="md-block">
-              <h3>下周重点</h3>
+              <h3>Focus next week</h3>
               <ol>
                 {project.nextFocus.map((item) => (
                   <li key={item}>{item}</li>
@@ -232,7 +232,7 @@ export function ProjectPage({
               </ol>
             </section>
             <section className="md-block">
-              <h3>风险</h3>
+              <h3>Risks</h3>
               <p>{project.risks}</p>
             </section>
           </div>
