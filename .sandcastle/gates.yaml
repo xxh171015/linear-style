@@ -1,5 +1,5 @@
 version: 1
-setup: pnpm install --frozen-lockfile
+setup: pnpm install --frozen-lockfile --allow-build=esbuild
 commands:
   - name: typecheck
     run: pnpm typecheck
