@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { CURRENT_USER, seedIssues, seedProjects, seedViews, TEAM_KEY } from "./data";
 import {
   createKernel,
   explainViewFilter,
@@ -565,6 +566,39 @@ describe("Custom View saved query", () => {
     kernel.groupIssues(kernel.teamIssues(), "assignee");
     expect(kernel.getCustomView(created.id)?.grouping).toBe("priority");
     expect(kernel.getCustomView(created.id)?.layout).toBe("board");
+  });
+
+  test("board layout is presentation-only: membership still follows the View filter", () => {
+    const kernel = kernelWith(catalog, {
+      views: [
+        view({
+          id: "board",
+          name: "Board",
+          layout: "board",
+          grouping: "status",
+          filter: { statuses: ["todo"] },
+        }),
+      ],
+    });
+    const members = kernel.customViewIssues("board");
+    expect(members.map((item) => item.id)).toEqual(["XXH-1"]);
+    expect(kernel.groupIssues(members, "status").map((group) => group.key)).toEqual(["todo"]);
+  });
+
+  test("a seeded board-layout Custom View has Issue membership for grouping columns", () => {
+    const kernel = createKernel({
+      viewer: CURRENT_USER,
+      teamKey: TEAM_KEY,
+      issues: seedIssues,
+      projects: seedProjects,
+      views: seedViews,
+    });
+    const boardViews = seedViews.filter((item) => item.layout === "board");
+    const populated = boardViews.filter((item) => kernel.customViewIssues(item.id).length > 0);
+    expect(populated.length).toBeGreaterThan(0);
+    const board = populated[0]!;
+    const groups = kernel.groupIssues(kernel.customViewIssues(board.id), board.grouping);
+    expect(groups.some((group) => group.items.length > 0)).toBe(true);
   });
 
   test("a non-Issue View Model is not product and matches nothing", () => {

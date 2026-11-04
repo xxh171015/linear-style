@@ -1895,6 +1895,127 @@ function IssuePanel({
   );
 }
 
+function IssueListItem({
+  issue,
+  layout,
+  active,
+  checked,
+  showPriority,
+  statusMenuOpen,
+  onHover,
+  onOpen,
+  onSelect,
+  onStatus,
+  onPickStatus,
+}: {
+  issue: Issue;
+  layout: ViewLayout;
+  active: boolean;
+  checked: boolean;
+  showPriority: boolean;
+  statusMenuOpen: boolean;
+  onHover: (id: string) => void;
+  onOpen: (id: string) => void;
+  onSelect: (id: string) => void;
+  onStatus: (id: string) => void;
+  onPickStatus: (id: string, status: IssueStatus) => void;
+}) {
+  const board = layout === "board";
+  const statusMenu = statusMenuOpen ? (
+    <div
+      className={board ? "status-menu list-status-menu board-status-menu" : "status-menu list-status-menu"}
+      onClick={(event) => event.stopPropagation()}
+    >
+      <div className="status-menu-issue">
+        {issue.id} · {issue.title}
+      </div>
+      <div className="status-menu-head">Change status…</div>
+      {STATUSES.map((status, index) => (
+        <button
+          key={status}
+          className={status === issue.status ? "status-option active" : "status-option"}
+          type="button"
+          onClick={() => onPickStatus(issue.id, status)}
+        >
+          <StatusIcon status={status} />
+          {STATUS_LABEL[status]}
+          <span className="status-check">{status === issue.status ? <CheckTinyIcon /> : null}</span>
+          <span className="push">{index + 1}</span>
+        </button>
+      ))}
+    </div>
+  ) : null;
+
+  const checkControl = (
+    <button
+      type="button"
+      className={checked ? "issue-check on" : "issue-check"}
+      aria-label="Select issue"
+      onClick={(event) => {
+        event.stopPropagation();
+        onSelect(issue.id);
+      }}
+    />
+  );
+  const statusControl = (
+    <button
+      type="button"
+      className="status-hit"
+      aria-label="Change status"
+      onClick={(event) => {
+        event.stopPropagation();
+        onStatus(issue.id);
+      }}
+    >
+      <StatusIcon status={issue.status} />
+    </button>
+  );
+
+  return (
+    <div
+      className={board ? (active ? "issue board-card selected" : "issue board-card") : active ? "issue selected" : "issue"}
+      role="button"
+      tabIndex={0}
+      onMouseEnter={() => onHover(issue.id)}
+      onClick={() => onOpen(issue.id)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") onOpen(issue.id);
+      }}
+    >
+      {board ? (
+        <>
+          <div className="board-card-top">
+            {checkControl}
+            {statusControl}
+            <span className="issue-id">{issue.id}</span>
+            {showPriority ? <PriorityIcon level={issue.priority} /> : null}
+          </div>
+          <span className="issue-title">{issue.title}</span>
+          <div className="board-card-meta">
+            {issue.labels[0] ? <span className="chip">{issue.labels[0]}</span> : null}
+            <span className="board-card-meta-spacer" />
+            {issue.assignee ? <span className="row-avatar">{issue.assignee.slice(0, 1)}</span> : null}
+            <span className="issue-date">{issue.date}</span>
+          </div>
+        </>
+      ) : (
+        <>
+          {checkControl}
+          <span className="issue-grip"><GripIcon /></span>
+          <span className="issue-id">{issue.id}</span>
+          {statusControl}
+          {showPriority ? <PriorityIcon level={issue.priority} /> : <span />}
+          <span className="issue-title">{issue.title}</span>
+          {issue.labels[0] ? <span className="chip">{issue.labels[0]}</span> : <span />}
+          {issue.assignee ? <span className="row-avatar">{issue.assignee.slice(0, 1)}</span> : <span />}
+          <span className="issue-date">{issue.date}</span>
+        </>
+      )}
+      {statusMenu}
+    </div>
+  );
+}
+
 function IssueList({
   groups,
   layout = "list",
@@ -1924,85 +2045,40 @@ function IssueList({
   onPickStatus: (id: string, status: IssueStatus) => void;
   onCreateIn: (status?: IssueStatus) => void;
 }) {
+  const board = layout === "board";
   return (
-    <ul className={layout === "board" ? "issue-list board-layout" : "issue-list"}>
-      {groups.map((group) => (
-        <li key={group.key} className="issue-group">
-          <div className="group-head">
-            {group.status ? <StatusIcon status={group.status} /> : <ViewsIcon />}
-            <span>{group.label}</span>
-            <span className="count">{group.items.length}</span>
-            <button className="tb-icon" type="button" aria-label={`Create in ${group.label}`} onClick={() => onCreateIn(group.status)}>
-              <PlusIcon />
-            </button>
-          </div>
-          {group.items.map((issue) => {
-            const active = issue.id === cursorId || issue.id === issueId;
-            return (
-              <div
-                key={issue.id}
-                className={active ? "issue selected" : "issue"}
-                role="button"
-                tabIndex={0}
-                onMouseEnter={() => onHover(issue.id)}
-                onClick={() => onOpen(issue.id)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") onOpen(issue.id);
-                }}
-              >
-                <button
-                  type="button"
-                  className={checkedIds.includes(issue.id) ? "issue-check on" : "issue-check"}
-                  aria-label="Select issue"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onSelect(issue.id);
-                  }}
-                />
-                <span className="issue-grip"><GripIcon /></span>
-                <span className="issue-id">{issue.id}</span>
-                <button
-                  type="button"
-                  className="status-hit"
-                  aria-label="Change status"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onStatus(issue.id);
-                  }}
-                >
-                  <StatusIcon status={issue.status} />
-                </button>
-                {showPriority ? <PriorityIcon level={issue.priority} /> : <span />}
-                <span className="issue-title">{issue.title}</span>
-                {issue.labels[0] ? <span className="chip">{issue.labels[0]}</span> : <span />}
-                {issue.assignee ? <span className="row-avatar">{issue.assignee.slice(0, 1)}</span> : <span />}
-                <span className="issue-date">{issue.date}</span>
-                {listStatusOpen && issue.id === cursorId ? (
-                  <div className="status-menu list-status-menu" onClick={(event) => event.stopPropagation()}>
-                    <div className="status-menu-issue">
-                      {issue.id} · {issue.title}
-                    </div>
-                    <div className="status-menu-head">Change status…</div>
-                    {STATUSES.map((status, index) => (
-                      <button
-                        key={status}
-                        className={status === issue.status ? "status-option active" : "status-option"}
-                        type="button"
-                        onClick={() => onPickStatus(issue.id, status)}
-                      >
-                        <StatusIcon status={status} />
-                        {STATUS_LABEL[status]}
-                        <span className="status-check">{status === issue.status ? <CheckTinyIcon /> : null}</span>
-                        <span className="push">{index + 1}</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
-              </div>
-            );
-          })}
-        </li>
-      ))}
+    <ul className={board ? "issue-list board-layout" : "issue-list"}>
+      {groups.map((group) => {
+        const items = group.items.map((issue) => (
+          <IssueListItem
+            key={issue.id}
+            issue={issue}
+            layout={layout}
+            active={issue.id === cursorId || issue.id === issueId}
+            checked={checkedIds.includes(issue.id)}
+            showPriority={showPriority}
+            statusMenuOpen={listStatusOpen && issue.id === cursorId}
+            onHover={onHover}
+            onOpen={onOpen}
+            onSelect={onSelect}
+            onStatus={onStatus}
+            onPickStatus={onPickStatus}
+          />
+        ));
+        return (
+          <li key={group.key} className="issue-group">
+            <div className="group-head">
+              {group.status ? <StatusIcon status={group.status} /> : <ViewsIcon />}
+              <span>{group.label}</span>
+              <span className="count">{group.items.length}</span>
+              <button className="tb-icon" type="button" aria-label={`Create in ${group.label}`} onClick={() => onCreateIn(group.status)}>
+                <PlusIcon />
+              </button>
+            </div>
+            {board ? <div className="board-column-body">{items}</div> : items}
+          </li>
+        );
+      })}
     </ul>
   );
 }

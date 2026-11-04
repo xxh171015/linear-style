@@ -228,6 +228,20 @@ export const seedViews: CustomView[] = [
     filter: { labels: ["wontfix"], statuses: ["canceled"], priority: 0 },
     teamKey: TEAM_KEY,
   },
+  {
+    id: "status-board",
+    slugId: "status-board",
+    name: "Status board",
+    description: "Assigned Issues as a board layout Custom View (XXH-18)",
+    modelName: "Issue",
+    shared: true,
+    owner: CURRENT_USER,
+    icon: "issues",
+    grouping: "status",
+    layout: "board",
+    filter: { assignedToMe: true },
+    teamKey: TEAM_KEY,
+  },
 ];
 
 export const seedActivity: Activity[] = [
