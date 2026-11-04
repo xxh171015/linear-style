@@ -1,0 +1,10 @@
+version: 1
+setup: pnpm install --frozen-lockfile
+commands:
+  - name: typecheck
+    run: pnpm typecheck
+    timeoutSeconds: 300
+  - name: test
+    run: mkdir -p reports && pnpm test
+    timeoutSeconds: 600
+    junit: reports/junit.xml

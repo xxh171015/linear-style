@@ -1,360 +1,177 @@
-# Issue tracker: Linear (team XXH)
+<!-- plat tracker-doc 0.1.0 skills mattpocock/skills@59db609eb1e18aaf59b63284d0e52255aff0c63c project 2 repo linear-style -->
 
-Issues and specs for this repo live in **Linear**, not GitHub Issues.
+# Issue tracker: the afk-platform and GitHub
 
-| Field                   | Value                                                                                                        |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Workspace               | [xuxinghua](https://linear.app/xuxinghua)                                                                    |
-| Team key                | `XXH`                                                                                                        |
-| Issue IDs               | `XXH-<n>` (e.g. `XXH-11`)                                                                                    |
-| Project (optional home) | 个人研发节奏试用                                                                                             |
-| CLI (preferred)         | [`@schpet/linear-cli`](https://github.com/schpet/linear-cli) (`linear` on PATH, or `npx @schpet/linear-cli`) |
-| Official `@linear/cli`  | **Do not use** — abandoned (`lin new` / `lin checkout` only, last useful publish 2021)                       |
-| MCP                     | Optional for interactive agents; **not** enough for Sandcastle (needs shell LIST/VIEW/CLOSE)                 |
+This repo's specs and tickets live in the **afk-platform**; everything else stays on **GitHub**. Pick the side
+by what the skill is working on:
 
-Domain language (`GLOSSARY.md`, `docs/adr/`) lives in **git**. Do not treat Linear long descriptions as the glossary/ADR source of truth.
+| A skill says …                                        | Goes to       | Use            |
+| ----------------------------------------------------- | ------------- | -------------- |
+| to-spec: publish the spec                             | the platform  | `plat`         |
+| to-tickets: publish tickets                           | the platform  | `plat`         |
+| implement: fetch the ticket                           | the platform  | `plat`         |
+| code-review: find the spec                            | the platform  | `plat`         |
+| wayfinder: the map and its tickets                    | GitHub | `gh` |
+| triage: labels, needs-info, ready-for-agent on issues | GitHub | `gh` |
+| pull requests treated as requests                     | GitHub | `gh` |
 
-**PRs as a request surface: no.** GitHub PRs are implementation vehicles (`Fixes XXH-n`); they are not triage intake.
+The platform has no labels and no comments, which is why triage and wayfinder stay on GitHub. Each part
+below is complete for its side; do not look for either one elsewhere.
 
+## On the platform (`plat`)
+
+Specs and tickets live in the afk-platform, not on the code host. Use the `plat` CLI for all of it.
+`plat` is a command on this machine; run it from this repo, so file paths are relative to here. It talks to
+`$AFK_API_URL`, default `http://127.0.0.1:3000`. Add `--json` for machine output. `plat --help` and
+`plat <command> --help` list every command.
+
+This repo is the project's `linear-style` repo (`repo: linear-style` in a ticket file); the project is `2` on the platform.
+
+The platform has no labels and no comments. A draft spec is what a skill means by `ready-for-agent`: apply no label.
+
+### Conventions
+
+- **Publish a spec** (what a skill means by "publish to the issue tracker" for a spec):
+  Write the spec markdown **outside this repo** (do not commit it), then:
+  `plat spec create --project 2 --type feature --title "<title>" --slug <english-slug> --file ~/.afk/planning/draft/spec.md`
+  It prints the spec number, e.g. `S-7`. Pass `--slug` (lowercase letters, digits, hyphens) whenever the title has no
+  Latin words: a Chinese-only title cannot be turned into a slug. The spec is stored as written. `plat` warns, on
+  stderr, about a section of the to-spec template that is missing or renamed, and about a Testing Decisions section
+  that names no seams; it still creates the spec. After it prints `S-7`, keep process files under `~/.afk/planning/S-7/`.
+- **Planning docs** (`GLOSSARY.md`, `docs/adr/`, `AGENTS.md` in this repo, as grill-with-docs and domain-modeling
+  write them): leave the changes **uncommitted and unpushed**. `plat spec confirm` sends them and the platform
+  commits them onto the spec's integration branch, so they reach the default branch with the spec's pull request.
+- **Read a spec** (what a skill means by "fetch the issue and read its body and comments"): `plat spec show S-7`.
+  It prints the spec's body, its tickets, edges and warnings (after the run, the acceptance pack). A spec has no comments.
+- **Publish tickets** (to-tickets step 5). On this tracker publishing is four steps, in this order:
+  1. Write one markdown file per ticket into `~/.afk/planning/S-7/` (create the directory; it is outside git), e.g.
+     `~/.afk/planning/S-7/01-contract.md`, numbered in dependency order (format below). Do not put these files in
+     this repository.
+  2. `plat tickets import S-7 ~/.afk/planning/S-7/`. The import is all or nothing and lists every problem at once; fix
+     the files and run it again. A spec takes one import while it is a draft. The platform is then the only source of
+     the spec and its tickets.
+  3. Show the person the import's warnings exactly as printed (or say there were none), then ask once:
+     "开工吗？" (start the work now?).
+  4. If they say yes, run `plat spec confirm S-7` here, in this repo. It sends the planning docs (below) as they are in
+     this checkout, and the platform commits them before any ticket starts. Then tell them that from here they only
+     wait for the acceptance pack, merge the pull requests, and look at `plat blocked`. If they say no, stop; they can
+     confirm later here (the platform's page cannot send the planning docs).
+
+  Confirming is the last step of publishing tickets on this tracker. It does not change the spec's body and does not
+  close the spec, so it is **not** what a skill means by "modify a parent issue".
+- **Fetch a ticket** (a skill's "fetch the relevant ticket"): `plat ticket view T-8 --md` prints the ticket file, the
+  same text the agent reads; `plat ticket view T-8` shows its runs, findings and neighbours as well.
+- **Change a ticket that has not started**: `plat ticket view T-8 --md > t.md`, edit the file, `plat ticket edit T-8 --file t.md`.
+  Only the title, the body, `modules` and `protected_paths_ok` can change; the other front matter fields may be left out,
+  and written they must equal the ticket's. To change those, cancel the ticket and append a new one with
+  `plat tickets import S-7 <dir> --append`.
+- **See what waits for a person**: `plat blocked` (blocked tickets, paused specs, and pull requests that were closed
+  without merge or could not be read; the platform never touches a pull request, so reopen it on the host, rework the
+  spec, or `plat spec cancel S-7`). Read a run's log: `plat run logs R-25`.
+- **Unblock**: `plat ticket retry T-8`, `plat ticket approve-protected T-8` (only after the gate found a
+  protected-path change), `plat ticket allow-path T-8 .github/CODEOWNERS` (a blocked ticket that needs a protected path
+  the file did not approve; then retry it), `plat ticket cancel T-8`. Ticket commands live under `ticket`, not at the
+  top level. To give up a whole spec, `plat spec cancel S-7`.
+
+Numbers are global and are never reused, and a failed `spec create` may still take one. Always use the number the
+command printed.
+
+### Ticket file
+
+Front matter holds the title and the platform's fields; after it comes the issue template exactly as to-tickets
+writes it. The file name without `.md` is the ticket's key.
+
+```markdown
 ---
 
-## Auth
-
-Create a personal API key: https://linear.app/settings/account/security → Personal API keys (`lin_api_…`). Member access required.
-
-**Non-interactive / CI / Sandcastle (preferred for agents):**
-
-```bash
-export LINEAR_API_KEY="lin_api_..."
-export LINEAR_TEAM_ID="XXH"          # default team for create/list when flags omit --team
-# optional: export LINEAR_WORKSPACE="xuxinghua"
-```
-
-`LINEAR_API_KEY` wins over stored credentials. Do not combine it with `--workspace` (the key already selects the workspace).
-
-**Interactive human setup:**
-
-```bash
-npx @schpet/linear-cli auth login --key "$LINEAR_API_KEY"
-# or: linear auth login
-cd "$(git rev-parse --show-toplevel)"
-npx @schpet/linear-cli config   # writes .linear.toml (team_id / workspace)
-```
-
-Recommended committed project config (no secrets):
-
-```toml
-# .linear.toml
-workspace = "xuxinghua"
-team_id = "XXH"
-issue_create_assign_self = "never"
-issue_create_ask_project = false
-```
-
-Always pass `--no-input` in scripts so missing flags fail instead of prompting.
-
+title: 订单增加备注字段
+repo: linear-style
+type: implementation # contract | implementation | integration
+modules: ["src/orders/**", "test/**"]
+blocked_by: [01-contract] # keys of other files; these are the native blocking edges
 ---
 
-## Label vocabulary (Matt triage roles → Linear)
+## Parent
 
-| Role in mattpocock/skills | Label / place in Linear                                                   | Meaning                                            | Enter Cycle? |
-| ------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------- | ------------ |
-| `needs-triage`            | **Triage inbox** (workflow state `Triage`); optional label `needs-triage` | Just arrived; maintainer must evaluate             | No           |
-| `needs-info`              | Label **`needs-spec`**                                                    | Spec incomplete; grill / to-spec before scheduling | No           |
-| `ready-for-agent`         | Label **`ready-for-agent`**                                               | Fully specified + Agent Brief; AFK-safe            | Yes (Focus)  |
-| `ready-for-human`         | Label **`ready-for-human`**                                               | Requires a human implementer                       | Yes          |
-| `wontfix`                 | Label **`wontfix`**, then cancel                                          | Will not be actioned                               | No           |
+S-7
 
-Hard rule for this repo: **no Cycle placement without `ready-for-agent` or `ready-for-human`.** Tickets still labelled `needs-spec` stay in Triage/Backlog.
+## What to build
 
-Applying `ready-for-agent` is not enough for Sandcastle by itself: Linear creates issues in **Triage**, and `/to-tickets` children inherit that. Always pass **`--state Backlog`** on create or update when labelling `ready-for-agent`. LIST also includes Triage as a safety net so a forgotten state move still shows up.
-
-Ensure labels exist once (idempotent create is fine if already present):
-
-```bash
-linear label create --team XXH --name needs-spec --yes --no-input
-linear label create --team XXH --name ready-for-agent --yes --no-input
-linear label create --team XXH --name ready-for-human --yes --no-input
-linear label create --team XXH --name wontfix --yes --no-input
-# optional mirror of Matt's needs-triage string:
-linear label create --team XXH --name needs-triage --yes --no-input
-```
-
----
-
-## Conventions (agent copy-paste)
-
-Prefix every command with `npx @schpet/linear-cli` if `linear` is not on PATH. Examples below assume `linear` is available.
-
-### Create an issue
-
-```bash
-cat > /tmp/issue-body.md <<'MD'
-## Problem
 ...
 
 ## Acceptance criteria
-- [ ] ...
-MD
 
-linear issue create \
-  --team XXH \
-  --title "Short title" \
-  --description-file /tmp/issue-body.md \
-  --label needs-spec \
-  --no-input \
-  --yes
+- [ ] POST /orders 接受可选的 note，超长返回 400
 ```
 
-Optional flags: `--project "个人研发节奏试用"`, `--parent XXH-5`, `--priority high|medium|low|urgent|none`, `--state Triage|Backlog`, `--cycle active|next`.
+- `## Parent` must be the spec being imported into.
+- Blocking edges go only in `blocked_by`. Do not write a `## Blocked by` section: the import rejects it. When you
+  append to a confirmed spec, `blocks: [T-3]` makes a new ticket block an existing one.
+- Each acceptance line is a single `- [ ] ` line; the section holds nothing else. The acceptance criteria are read
+  from this section, never written twice.
+- Every ticket needs `repo`, `type`, a `title` and at least one glob in `modules`. Other optional fields:
+  `protected_paths_ok`, `contract`, `refs`, `environment`. Unknown keys are rejected.
+- **Quote** a `title` that contains `: ` or starts with a special character, or the YAML will not parse.
+- A ticket that changes a **protected path** (project setting, `.github/**` by default, plus the contract file) must
+  list the exact files in `protected_paths_ok`. Without it the ticket is blocked; fix it with `plat ticket allow-path`
+  and `plat ticket retry`.
+- `type: contract` is for a ticket that only edits the contract file. A ticket using `contract: <key>` must point at
+  a contract ticket.
+- Two tickets that touch overlapping `modules` but do not depend on each other get an overlap warning. That is not an
+  error: say so in the ticket if it is intended, otherwise add a `blocked_by`.
+- Dependencies must not form a cycle, and a ticket cannot depend on itself.
+- Acceptance lines should be testable through HTTP or the public interface: the pack marks a line verified only when
+  the tests the agent named for it exist in the merge gate's JUnit report and passed.
 
-`ready-for-agent` issues **must** leave Triage:
+## On GitHub (`gh`)
 
-```bash
-linear issue create \
-  --team XXH \
-  --title "Child slice" \
-  --parent XXH-5 \
-  --description-file /tmp/issue-body.md \
-  --label ready-for-agent \
-  --state Backlog \
-  --no-input \
-  --yes
-```
+# Issue tracker: GitHub
 
-Prefer `--description-file` / `--body-file` for any multi-line Markdown (avoids shell escaping and literal `\n`).
+Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
 
-### Read an issue
+## Conventions
 
-```bash
-linear issue view XXH-11 --json --no-input
-# human-readable (includes comments):
-linear issue view XXH-11 --no-input
-linear issue comment list XXH-11 --json --no-input
-```
+- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
+- **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
+- **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
+- **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards (`gh` 2.94+). Older `gh`: `gh api --method POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child-db-id>` (database id, as in **Blocking** below). Without sub-issues, put `Part of #<parent>` at the top of the child body.
+- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation. Add an edge with `gh issue create --blocked-by <n>,<n> ...` or `gh issue edit <child> --add-blocked-by <blocker>` (`gh` 2.94+). Older `gh`: `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
+- **Count open blockers**: `gh api repos/<owner>/<repo>/issues/<n> --jq .issue_dependencies_summary.blocked_by` (open blockers only; 0 means startable). `gh issue view <n> --json blockedBy` also lists closed blockers, so filter it: `--jq '[.blockedBy.nodes[] | select(.state == "OPEN")] | length'`.
+- **Comment on an issue**: `gh issue comment <number> --body "..."`
+- **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
+- **Close**: post the explanation with `gh issue comment <number> --body "..."`, then `gh issue close <number>`. On an already-closed issue, `gh issue close --comment` drops the comment and still exits 0.
 
-### List issues
+Infer the repo from `git remote -v`; `gh` does this automatically when run inside a clone.
 
-```bash
-# Team backlog slice
-linear issue query --team XXH --all-states --json --limit all --no-input
+File issues only into the user's own repo. Never file into `mattpocock/skills` (the repo these skills come from) unless the user owns it. In a fork, `gh` can default to the upstream parent, so before the first `gh issue create` of a session, check the target with `gh repo view --json nameWithOwner` and confirm it with the user if it is not their repo.
 
-# Triage / needs-spec
-linear issue query --team XXH --state triage --json --limit all --no-input
-linear issue query --team XXH --label needs-spec --json --limit all --no-input
+## Pull requests as a triage surface
 
-# AFK queue (Sandcastle LIST — see below)
-linear issue query --team XXH --label ready-for-agent \
-  --state triage --state unstarted --state started --state backlog \
-  --json --limit all --no-input
-```
+**PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
 
-Shape tip: prefer `--json` and map with `jq` to `{id: .identifier, title, body: .description}` when a skill expects GitHub-like fields.
+When set to `yes`, PRs run through the same labels and states as issues, using the `gh pr` equivalents:
 
-### Comment
+- **Read a PR**: `gh pr view <number>`, then `gh pr view <number> --comments` (off a TTY, `--comments` prints only the comments, not the body), and `gh pr diff <number>` for the diff.
+- **List external PRs for triage**: `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open' --jq '.[] | select(.author_association | IN("OWNER","MEMBER","COLLABORATOR") | not) | {number, title, author: .user.login, author_association, labels: [.labels[].name]}'`.
+- **Comment / label / close**: `gh pr comment`, `gh pr edit --add-label`/`--remove-label`, `gh pr close`.
 
-```bash
-cat > /tmp/comment.md <<'MD'
-## Agent Brief
-- Goal: ...
-- Out of scope: ...
-- Verify: ...
-MD
-linear issue comment add XXH-11 --body-file /tmp/comment.md --no-input --yes
-```
-
-### Apply / remove labels
-
-```bash
-# Add without wiping others
-linear issue update XXH-11 --add-label ready-for-agent --no-input
-linear issue update XXH-11 --remove-label needs-spec --no-input
-
-# Atomic swap (recommended when leaving needs-spec)
-linear issue update XXH-11 \
-  --remove-label needs-spec \
-  --add-label ready-for-agent \
-  --state Backlog \
-  --no-input
-
-# Replace entire label set (destructive)
-linear issue update XXH-11 --label ready-for-agent --no-input
-```
-
-### Close / cancel
-
-```bash
-# Done
-linear issue comment add XXH-11 --body "Completed." --no-input --yes
-linear issue update XXH-11 --state Done --no-input
-
-# Cancel / wontfix
-linear issue update XXH-11 --add-label wontfix --state Canceled --no-input
-```
-
-Prefer `Done` / `Canceled` over `issue archive` (archive bypasses Linear's normal checks and hides the issue from default lists).
-
-### Parent / sub-issue
-
-`/to-spec` lives on the **parent**. `/to-tickets` creates **children** that Sandcastle executes. Do not close or rewrite the parent while splitting.
-
-| When                      | Parent                                                                                        | Children                                                                |
-| ------------------------- | --------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
-| Splitting (`/to-tickets`) | Keep open. Spec stays on the parent. Remove `ready-for-agent` so LIST does not grab the spec. | Create with `--parent`, `--label ready-for-agent`, `--state Backlog`.   |
-| Sandcastle CLOSE          | Do **not** close.                                                                             | Close the child that was implemented (`scripts/linear-close.sh XXH-n`). |
-| **Every child is Done**   | Set parent to **Done**. Spec remains readable on the Done issue.                              | Already Done.                                                           |
-| More slices still planned | Leave parent open, but **not in Triage** (use Backlog).                                       | New children as above.                                                  |
-
-Do not leave a finished spec in **Triage**: it looks unprocessed. Do not archive the parent to keep the spec; Done is enough.
-
-```bash
-# At create time (AFK child: leave Triage)
-linear issue create --team XXH --title "Child slice" --parent XXH-5 \
-  --description-file /tmp/body.md \
-  --label ready-for-agent --state Backlog \
-  --no-input --yes
-
-# After the fact
-linear issue update XXH-12 --parent XXH-5 --no-input
-linear issue update XXH-12 --clear-parent --no-input
-
-# All children Done → close the spec parent (not Sandcastle's job)
-linear issue update XXH-13 --state Done --no-input
-```
-
-### Blocked-by / blocks / related
-
-Native Linear relations (UI-visible):
-
-```bash
-# XXH-12 is blocked by XXH-11
-linear issue relation add XXH-12 blocked-by XXH-11 --no-input
-
-# XXH-11 blocks XXH-12 (inverse wording)
-linear issue relation add XXH-11 blocks XXH-12 --no-input
-
-linear issue relation list XXH-12 --no-input
-linear issue relation delete XXH-12 blocked-by XXH-11 --yes --no-input
-```
-
-Also allowed: `related`, `duplicate`.
-
-Fallback if relations are unavailable: put `Blocked by: XXH-11` at the top of the child description.
-
-### Move into Cycle / Project
-
-```bash
-linear issue update XXH-11 --project "个人研发节奏试用" --cycle active --no-input
-```
-
----
+GitHub shares one number space across issues and PRs, so a bare `#42` may be either: resolve with `gh pr view 42` and fall back to `gh issue view 42`.
 
 ## When a skill says "publish to the issue tracker"
 
-Create a **Linear** issue on team `XXH` (commands above). Do **not** open a GitHub Issue unless the user explicitly asks.
+Create a GitHub issue.
 
 ## When a skill says "fetch the relevant ticket"
 
-`linear issue view <ID> --json` (and comments via `linear issue comment list <ID> --json`).
+Read it as in **Read an issue** above.
 
----
+## Wayfinding operations
 
-## Sandcastle custom tracker (LIST / VIEW / CLOSE)
+Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
 
-See `docs/agents/sandcastle.md` for the AFK loop runbook (`pnpm sandcastle`).
-
-Sandcastle has no first-party Linear integration. Use `sandcastle init --issue-tracker custom`, then wire these non-interactive commands (MCP alone is insufficient).
-
-Wrapper scripts live under `scripts/` (optional but recommended):
-
-| Slot      | Command                        |
-| --------- | ------------------------------ |
-| **LIST**  | `scripts/linear-list-ready.sh` |
-| **VIEW**  | `scripts/linear-view.sh <ID>`  |
-| **CLOSE** | `scripts/linear-close.sh <ID>` |
-
-Equivalent one-liners:
-
-```bash
-# LIST — JSON array of ready-for-agent issues
-linear issue query --team XXH --label ready-for-agent \
-  --state triage --state unstarted --state started --state backlog \
-  --json --limit all --no-input \
-  | jq '[.[] | {id: .identifier, number: .identifier, title, body: (.description // ""), labels: [.labels[].name]}]'
-
-# VIEW
-linear issue view <ID> --json --no-input
-
-# CLOSE
-linear issue comment add <ID> --body "Completed by Sandcastle" --no-input --yes \
-  && linear issue update <ID> --state Done --no-input
-```
-
-Sandbox Dockerfile install sketch:
-
-```dockerfile
-# Install @schpet/linear-cli binary (pin a release in real use)
-RUN curl -LsSf https://github.com/schpet/linear-cli/releases/latest/download/linear-installer.sh | sh
-```
-
-`.env` / `.env.example`:
-
-```bash
-LINEAR_API_KEY=
-LINEAR_TEAM_ID=XXH
-CURSOR_API_KEY=
-GH_TOKEN=
-```
-
----
-
-## GraphQL / curl fallback
-
-Use when `linear` cannot be installed. Auth header is the raw API key (same `LINEAR_API_KEY`).
-
-```bash
-# Viewer smoke test
-curl -sS https://api.linear.app/graphql \
-  -H "Content-Type: application/json" \
-  -H "Authorization: $LINEAR_API_KEY" \
-  -d '{"query":"{ viewer { id name } }"}'
-```
-
-Create / update via GraphQL when needed; resolve team UUID once:
-
-```bash
-curl -sS https://api.linear.app/graphql \
-  -H "Content-Type: application/json" \
-  -H "Authorization: $LINEAR_API_KEY" \
-  -d '{"query":"{ teams { nodes { id key name } } }"}'
-```
-
-Or via CLI without hand-writing the schema:
-
-```bash
-linear api --variables-json '{"filter":{"team":{"key":{"eq":"XXH"}},"labels":{"name":{"eq":"ready-for-agent"}}}}' <<'GRAPHQL'
-query($filter: IssueFilter!) {
-  issues(filter: $filter, first: 100) {
-    nodes { identifier title description state { name } labels { nodes { name } } }
-  }
-}
-GRAPHQL
-```
-
-Prefer dedicated `linear issue *` subcommands over raw GraphQL whenever they cover the operation.
-
----
-
-## GitHub ↔ Linear
-
-- Sandcastle AFK: named branch `sandcastle/linear-xxh-worker/<stamp>`, Matt `/pr` body, then `git push` + `gh pr create` (needs `GH_TOKEN` in `.sandcastle/.env`; sandbox cannot use host `gh` login or osxkeychain).
-- Interactive human: Linear's suggested branch (`xxh-11-…`) via `linear issue start XXH-11`, then `/pr` in Cursor.
-- PR body / commits: include `Fixes XXH-11` (or `Refs XXH-11`) so the Linear↔GitHub integration can close/link.
-- Do not file product specs as GitHub Issues for this repo.
-
----
-
-## Out of scope for this file
-
-- Glossary / ADR layout → see `docs/agents/domain.md` (when present) and root `GLOSSARY.md`.
-- Exact Matt label-role table duplicate → keep overrides here; optional `docs/agents/triage-labels.md` may mirror the table above.
+- **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
+- **Child ticket**: an issue linked to the map as a GitHub sub-issue (see **Make an issue a sub-issue of a parent**). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
+- **Blocking**: see **Blocking** under Conventions.
+- **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (see **Count open blockers**, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
+- **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
+- **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
