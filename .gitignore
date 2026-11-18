@@ -7,3 +7,13 @@ tsconfig*.tsbuildinfo
 .sandcastle/.env
 .sandcastle/logs/
 .sandcastle/worktrees/
+
+# Local reference screenshots and browser acceptance artifacts
+artifacts/qa/
+artifacts/linear-rea-*.json
+
+# Retained REA bundles are local research evidence
+artifacts/rea-*.json
+
+# Local native application builds
+artifacts/desktop/
