@@ -1,0 +1,93 @@
+{
+  "evidence_id": "ev_c1ebd0469a73e82c1aff9cd95ba5af9f7e2b53f2b9c87be30847804eb93e0dc5",
+  "operation": "capture_process_scenario",
+  "authority": "controlled-replay",
+  "confidence": "observed",
+  "exit": {
+    "code": 0,
+    "signal": 0,
+    "reason": "exited"
+  },
+  "cleanup": {
+    "owned_process_group": "verified",
+    "temporary_root": "removed",
+    "unverified_processes": [
+      {
+        "pid": 43595,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43599,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43824,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43825,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43826,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43878,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43879,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43956,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 43605,
+        "reason": "platform_binary_environment_withheld"
+      }
+    ]
+  },
+  "frames": [
+    {
+      "sequence": 0,
+      "at_ms": 1780,
+      "data": "replica-desktop-starting\r\n"
+    },
+    {
+      "sequence": 1,
+      "at_ms": 1780,
+      "data": "replica-desktop-requesting-instance-lock\r\n"
+    },
+    {
+      "sequence": 2,
+      "at_ms": 1780,
+      "data": "replica-desktop-instance-lock \u001b[33mtrue\u001b[39m\r\n"
+    },
+    {
+      "sequence": 3,
+      "at_ms": 1820,
+      "data": "replica-desktop-window-system-ready\r\n"
+    },
+    {
+      "sequence": 4,
+      "at_ms": 1970,
+      "data": "replica-desktop-loaded replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 5,
+      "at_ms": 2010,
+      "data": "replica-desktop-smoke-pass\r\n"
+    }
+  ],
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "The executable digest is a prelaunch file sample; matching path metadata immediately after spawn does not prove an atomic operating-system image binding.",
+    "Process trees are sampled and may omit short-lived descendants.",
+    "Filesystem observations are before/after snapshots, not syscall traces.",
+    "Inherited host environment variables are not recorded and may affect results.",
+    "No filesystem observation paths were selected; filesystem effects remain unknown."
+  ]
+}

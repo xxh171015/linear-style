@@ -1,0 +1,104 @@
+{
+  "evidence_id": "ev_f62ad39685b925cedfd728e3f0d7a39b0b85afbddf4211e5c1915fd06ab320fc",
+  "operation": "capture_process_scenario",
+  "authority": "controlled-replay",
+  "confidence": "observed",
+  "exit": {
+    "code": 0,
+    "signal": 0,
+    "reason": "exited"
+  },
+  "frames": [
+    {
+      "sequence": 0,
+      "at_ms": 2180,
+      "data": "replica-desktop-starting\r\n"
+    },
+    {
+      "sequence": 1,
+      "at_ms": 2700,
+      "data": "replica-desktop-loaded \u001b[33m1\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 2,
+      "at_ms": 2700,
+      "data": "replica-desktop-loaded \u001b[33m2\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 3,
+      "at_ms": 2750,
+      "data": "replica-desktop-window-ready \u001b[33m2\u001b[39m\r\n"
+    },
+    {
+      "sequence": 4,
+      "at_ms": 2790,
+      "data": "replica-desktop-window-ready \u001b[33m1\u001b[39m\r\n"
+    },
+    {
+      "sequence": 5,
+      "at_ms": 2790,
+      "data": "replica-desktop-smoke-pass \u001b[33m2\u001b[39m\r\n"
+    },
+    {
+      "sequence": 6,
+      "at_ms": 3050,
+      "data": "replica-desktop-quit-saved \u001b[33m2\u001b[39m\r\n"
+    }
+  ],
+  "cleanup": {
+    "owned_process_group": "verified",
+    "temporary_root": "removed",
+    "unverified_processes": [
+      {
+        "pid": 27362,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27363,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27389,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27390,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27418,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27443,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27469,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27472,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27477,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 27505,
+        "reason": "platform_binary_environment_withheld"
+      }
+    ]
+  },
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "The executable digest is a prelaunch file sample; matching path metadata immediately after spawn does not prove an atomic operating-system image binding.",
+    "Process trees are sampled and may omit short-lived descendants.",
+    "Process-tree sampling ended with an incomplete observation.",
+    "Filesystem observations are before/after snapshots, not syscall traces.",
+    "Inherited host environment variables are not recorded and may affect results.",
+    "No filesystem observation paths were selected; filesystem effects remain unknown.",
+    "Process sampling has incomplete observations: Sampler shutdown interrupted an unfinished process observation; unexamined processes remain unknown. See truncation_details.process."
+  ]
+}

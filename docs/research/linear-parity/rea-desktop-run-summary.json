@@ -1,0 +1,99 @@
+{
+  "evidence_id": "ev_7e4f028a900a7e9c0e8f0c6ffa3acb0d56f44794e12681c67c7c12df7b4f1b4b",
+  "operation": "capture_process_scenario",
+  "authority": "controlled-replay",
+  "confidence": "observed",
+  "exit": {
+    "code": 0,
+    "signal": 0,
+    "reason": "exited"
+  },
+  "cleanup": {
+    "owned_process_group": "verified",
+    "temporary_root": "removed",
+    "unverified_processes": [
+      {
+        "pid": 16407,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16533,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16644,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16645,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16672,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16723,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16724,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16751,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16828,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 16593,
+        "reason": "platform_binary_environment_withheld"
+      }
+    ]
+  },
+  "frames": [
+    {
+      "sequence": 0,
+      "at_ms": 440,
+      "data": "replica-desktop-starting\r\n"
+    },
+    {
+      "sequence": 1,
+      "at_ms": 440,
+      "data": "replica-desktop-requesting-instance-lock\r\nreplica-desktop-instance-lock \u001b[33mtrue\u001b[39m\r\n"
+    },
+    {
+      "sequence": 2,
+      "at_ms": 520,
+      "data": "replica-desktop-window-system-ready\r\n"
+    },
+    {
+      "sequence": 3,
+      "at_ms": 720,
+      "data": "replica-renderer Loading the stylesheet 'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:opsz,wght@14..32,100..700&display=swap' violates the following Content Security Policy directive: \"style-src 'self' 'unsafe-inline'\". Note that 'style-src-elem' was not explicitly set, so 'style-src' is used as a fallback. The action has been blocked.\r\n"
+    },
+    {
+      "sequence": 4,
+      "at_ms": 760,
+      "data": "replica-desktop-loaded replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 5,
+      "at_ms": 830,
+      "data": "replica-desktop-smoke-pass\r\n"
+    }
+  ],
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "The executable digest is a prelaunch file sample; matching path metadata immediately after spawn does not prove an atomic operating-system image binding.",
+    "Process trees are sampled and may omit short-lived descendants.",
+    "Process-tree sampling ended with an incomplete observation.",
+    "Filesystem observations are before/after snapshots, not syscall traces.",
+    "Inherited host environment variables are not recorded and may affect results.",
+    "No filesystem observation paths were selected; filesystem effects remain unknown.",
+    "Process sampling has incomplete observations: Sampler shutdown interrupted an unfinished process observation; unexamined processes remain unknown. See truncation_details.process."
+  ]
+}
