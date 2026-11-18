@@ -8,13 +8,24 @@ import type {
   ProjectTab,
 } from "./types";
 
-export { ISSUE_GROUPINGS, ISSUE_STATUSES as STATUSES, PRIORITY_LABEL, STATUS_LABEL } from "./kernel";
+export {
+  ISSUE_GROUPINGS,
+  ISSUE_STATUSES as STATUSES,
+  PRIORITY_LABEL,
+  STATUS_LABEL,
+} from "./kernel";
 
 /** Linear WorkflowState.type mapping used by grouping and progress. */
-export const WORKFLOW_TYPE: Record<IssueStatus, "backlog" | "unstarted" | "started" | "completed" | "canceled"> = {
+export const WORKFLOW_TYPE: Record<
+  IssueStatus,
+  "backlog" | "unstarted" | "started" | "completed" | "canceled" | "triage"
+> = {
   backlog: "backlog",
   todo: "unstarted",
   progress: "started",
+  review: "started",
+  duplicate: "canceled",
+  triage: "triage",
   done: "completed",
   canceled: "canceled",
 };
@@ -35,18 +46,35 @@ export const HEALTH_LABEL = {
 } as const;
 
 export function nextStatus(status: IssueStatus): IssueStatus {
-  return ISSUE_STATUSES[(ISSUE_STATUSES.indexOf(status) + 1) % ISSUE_STATUSES.length];
+  return ISSUE_STATUSES[
+    (ISSUE_STATUSES.indexOf(status) + 1) % ISSUE_STATUSES.length
+  ];
 }
 
 export function nextProjectStatus(status: ProjectStatus): ProjectStatus {
-  return PROJECT_STATUSES[(PROJECT_STATUSES.indexOf(status) + 1) % PROJECT_STATUSES.length];
+  return PROJECT_STATUSES[
+    (PROJECT_STATUSES.indexOf(status) + 1) % PROJECT_STATUSES.length
+  ];
 }
 
-export function emptyFrame(): Pick<Frame, "projectId" | "viewId" | "projectTab" | "issueId"> {
-  return { projectId: null, viewId: null, projectTab: "overview", issueId: null };
+export function emptyFrame(): Pick<
+  Frame,
+  "projectId" | "viewId" | "projectTab" | "issueId"
+> {
+  return {
+    projectId: null,
+    viewId: null,
+    projectTab: "overview",
+    issueId: null,
+  };
 }
 
-const ISSUE_TABS: IssueTab[] = ["assigned", "created", "subscribed", "activity"];
+const ISSUE_TABS: IssueTab[] = [
+  "assigned",
+  "created",
+  "subscribed",
+  "activity",
+];
 const PROJECT_TABS: ProjectTab[] = ["overview", "activity", "issues"];
 const NAVS: NavId[] = [
   "inbox",
@@ -58,19 +86,31 @@ const NAVS: NavId[] = [
   "loops",
   "team-home",
   "team-issues",
+  "triage",
+  "cycles",
+  "initiatives",
+  "settings",
 ];
 
-export function parseHash(hash = typeof window === "undefined" ? "" : window.location.hash): Frame & {
+export function parseHash(
+  hash = typeof window === "undefined" ? "" : window.location.hash,
+): Frame & {
   composer: boolean;
   command: boolean;
 } {
-  const parts = hash.replace(/^#/, "").replace(/^\//, "").split("/").filter(Boolean);
+  const parts = hash
+    .replace(/^#/, "")
+    .replace(/^\//, "")
+    .split("/")
+    .filter(Boolean);
   const frame: Frame = { nav: "my-issues", tab: "assigned", ...emptyFrame() };
   const extras = { composer: false, command: false };
 
   if (!parts.length) return { ...frame, ...extras };
-  if (parts[0] === "composer") return { ...frame, composer: true, command: false };
-  if (parts[0] === "command") return { ...frame, composer: false, command: true };
+  if (parts[0] === "composer")
+    return { ...frame, composer: true, command: false };
+  if (parts[0] === "command")
+    return { ...frame, composer: false, command: true };
   if (ISSUE_TABS.includes(parts[0] as IssueTab) && parts.length === 1) {
     return { ...frame, tab: parts[0] as IssueTab, ...extras };
   }
@@ -81,7 +121,9 @@ export function parseHash(hash = typeof window === "undefined" ? "" : window.loc
     return { ...frame, issueId: decodeURIComponent(parts[1]), ...extras };
   }
   if (parts[0] === "project" && parts[1]) {
-    const projectTab = PROJECT_TABS.includes(parts[2] as ProjectTab) ? (parts[2] as ProjectTab) : "overview";
+    const projectTab = PROJECT_TABS.includes(parts[2] as ProjectTab)
+      ? (parts[2] as ProjectTab)
+      : "overview";
     return {
       ...frame,
       nav: "projects",
@@ -91,10 +133,17 @@ export function parseHash(hash = typeof window === "undefined" ? "" : window.loc
     };
   }
   if (parts[0] === "view" && parts[1]) {
-    return { ...frame, nav: "views", viewId: decodeURIComponent(parts[1]), ...extras };
+    return {
+      ...frame,
+      nav: "views",
+      viewId: decodeURIComponent(parts[1]),
+      ...extras,
+    };
   }
   if (parts[0] === "my-issues") {
-    const tab = ISSUE_TABS.includes(parts[1] as IssueTab) ? (parts[1] as IssueTab) : "assigned";
+    const tab = ISSUE_TABS.includes(parts[1] as IssueTab)
+      ? (parts[1] as IssueTab)
+      : "assigned";
     return { ...frame, nav: "my-issues", tab, ...extras };
   }
   if (NAVS.includes(parts[0] as NavId)) {
@@ -103,7 +152,10 @@ export function parseHash(hash = typeof window === "undefined" ? "" : window.loc
   return { ...frame, ...extras };
 }
 
-export function hashFor(frame: Frame, extras?: { composer?: boolean; command?: boolean }): string {
+export function hashFor(
+  frame: Frame,
+  extras?: { composer?: boolean; command?: boolean },
+): string {
   if (extras?.composer) return "#/composer";
   if (extras?.command) return "#/command";
   if (frame.issueId) return `#/issue/${encodeURIComponent(frame.issueId)}`;
@@ -116,12 +168,17 @@ export function hashFor(frame: Frame, extras?: { composer?: boolean; command?: b
     return `#/view/${encodeURIComponent(frame.viewId)}`;
   }
   if (frame.nav === "my-issues") {
-    return frame.tab === "assigned" ? "#/my-issues" : `#/my-issues/${frame.tab}`;
+    return frame.tab === "assigned"
+      ? "#/my-issues"
+      : `#/my-issues/${frame.tab}`;
   }
   return `#/${frame.nav}`;
 }
 
-export function toFrame(partial: Partial<Frame> & { nav: NavId }, fallbackTab: IssueTab = "assigned"): Frame {
+export function toFrame(
+  partial: Partial<Frame> & { nav: NavId },
+  fallbackTab: IssueTab = "assigned",
+): Frame {
   return {
     nav: partial.nav,
     tab: partial.tab ?? fallbackTab,

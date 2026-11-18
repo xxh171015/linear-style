@@ -6,7 +6,13 @@ import {
   ISSUE_STATUSES,
   PROJECT_STATUSES,
 } from "./kernel";
-import type { CustomView, Issue, IssueGrouping, Project, ProjectMilestone } from "./types";
+import type {
+  CustomView,
+  Issue,
+  IssueGrouping,
+  Project,
+  ProjectMilestone,
+} from "./types";
 
 const viewer = "Ada";
 const teamKey = "XXH";
@@ -24,7 +30,9 @@ function issue(partial: Partial<Issue> & Pick<Issue, "id" | "title">): Issue {
   };
 }
 
-function project(partial: Partial<Project> & Pick<Project, "id" | "name">): Project {
+function project(
+  partial: Partial<Project> & Pick<Project, "id" | "name">,
+): Project {
   return {
     slugId: partial.slugId ?? partial.id,
     description: "",
@@ -43,7 +51,9 @@ function project(partial: Partial<Project> & Pick<Project, "id" | "name">): Proj
   };
 }
 
-function view(partial: Partial<CustomView> & Pick<CustomView, "id" | "name">): CustomView {
+function view(
+  partial: Partial<CustomView> & Pick<CustomView, "id" | "name">,
+): CustomView {
   return {
     slugId: partial.slugId ?? partial.id,
     description: "",
@@ -60,7 +70,11 @@ function view(partial: Partial<CustomView> & Pick<CustomView, "id" | "name">): C
 
 function kernelWith(
   issues: Issue[],
-  extra?: { projects?: Project[]; views?: CustomView[]; milestones?: ProjectMilestone[] },
+  extra?: {
+    projects?: Project[];
+    views?: CustomView[];
+    milestones?: ProjectMilestone[];
+  },
 ) {
   return createKernel({
     viewer,
@@ -85,7 +99,9 @@ describe("Issue identifier and create defaults", () => {
   });
 
   test("a new Issue starts in backlog with Estimate absent and no Milestone", () => {
-    const created = createKernel({ viewer, teamKey }).createIssue({ title: "Fresh" });
+    const created = createKernel({ viewer, teamKey }).createIssue({
+      title: "Fresh",
+    });
     expect(created.status).toBe("backlog");
     expect(created.estimate).toBeUndefined();
     expect(created.milestoneId).toBeUndefined();
@@ -95,17 +111,29 @@ describe("Issue identifier and create defaults", () => {
   });
 
   test("a new Issue may start in a chosen Issue status", () => {
-    const created = createKernel({ viewer, teamKey }).createIssue({ title: "Doing", status: "progress" });
+    const created = createKernel({ viewer, teamKey }).createIssue({
+      title: "Doing",
+      status: "progress",
+    });
     expect(created.status).toBe("progress");
   });
 });
 
 describe("Issue status and Estimate", () => {
-  test("Issue status is only backlog, todo, progress, done, or canceled", () => {
-    expect(ISSUE_STATUSES).toEqual(["backlog", "todo", "progress", "done", "canceled"]);
+  test("Issue states match the eight observed names", () => {
+    expect(ISSUE_STATUSES).toEqual([
+      "backlog",
+      "todo",
+      "progress",
+      "review",
+      "done",
+      "canceled",
+      "duplicate",
+      "triage",
+    ]);
   });
 
-  test("an Issue can change among the five statuses", () => {
+  test("an Issue can change among the observed named states", () => {
     const kernel = createKernel({ viewer, teamKey });
     const created = kernel.createIssue({ title: "Move" });
     for (const status of ISSUE_STATUSES) {
@@ -133,7 +161,10 @@ describe("Built-in Issue lists", () => {
       issue({ id: "XXH-1", title: "Mine", assignee: viewer, creator: viewer }),
       issue({ id: "XXH-2", title: "Other", creator: "Bo" }),
     ]);
-    expect(kernel.teamIssues().map((item) => item.id)).toEqual(["XXH-1", "XXH-2"]);
+    expect(kernel.teamIssues().map((item) => item.id)).toEqual([
+      "XXH-1",
+      "XXH-2",
+    ]);
   });
 
   test("My Issues Assigned uses assignee name = viewer", () => {
@@ -165,12 +196,18 @@ describe("Built-in Issue lists", () => {
       issue({ id: "XXH-1", title: "Watching", subscribed: true }),
       issue({ id: "XXH-2", title: "Ignoring", subscribed: false }),
     ]);
-    expect(kernel.myIssuesSubscribed().map((item) => item.id)).toEqual(["XXH-1"]);
+    expect(kernel.myIssuesSubscribed().map((item) => item.id)).toEqual([
+      "XXH-1",
+    ]);
   });
 
   test("the same Issue record is returned from My Issues and Team Issues", () => {
     const kernel = createKernel({ viewer, teamKey });
-    const created = kernel.createIssue({ title: "Shared identity", assignee: viewer, subscribed: true });
+    const created = kernel.createIssue({
+      title: "Shared identity",
+      assignee: viewer,
+      subscribed: true,
+    });
     expect(kernel.teamIssues()[0]).toBe(created);
     expect(kernel.myIssuesAssigned()[0]).toBe(created);
     expect(kernel.myIssuesCreated()[0]).toBe(created);
@@ -212,11 +249,22 @@ describe("Parent Issue", () => {
 });
 
 describe("Grouping on built-in lists", () => {
-  test("grouping words are status, priority, assignee, project, or none", () => {
-    expect(ISSUE_GROUPINGS).toEqual(["status", "priority", "assignee", "project", "none"]);
+  test("grouping options match the observed display menu", () => {
+    expect(ISSUE_GROUPINGS).toEqual([
+      "none",
+      "status",
+      "status-type",
+      "assignee",
+      "agent",
+      "project",
+      "priority",
+      "cycle",
+      "label",
+      "team",
+    ]);
   });
 
-  test("grouping by status uses the five Issue statuses and omits empty groups", () => {
+  test("grouping by status uses named states and omits empty groups", () => {
     const kernel = kernelWith([
       issue({ id: "XXH-1", title: "Todo", status: "todo" }),
       issue({ id: "XXH-2", title: "Done", status: "done" }),
@@ -238,11 +286,11 @@ describe("Grouping on built-in lists", () => {
       issue({ id: "XXH-2", title: "High", priority: 2 }),
       issue({ id: "XXH-3", title: "Urgent", priority: 1 }),
     ]);
-    expect(kernel.groupIssues(kernel.teamIssues(), "priority").map((group) => group.label)).toEqual([
-      "Urgent",
-      "High",
-      "No priority",
-    ]);
+    expect(
+      kernel
+        .groupIssues(kernel.teamIssues(), "priority")
+        .map((group) => group.label),
+    ).toEqual(["Urgent", "High", "No priority"]);
   });
 
   test("grouping by assignee uses the assignee name or No assignee", () => {
@@ -250,21 +298,26 @@ describe("Grouping on built-in lists", () => {
       issue({ id: "XXH-1", title: "Ada's", assignee: "Ada" }),
       issue({ id: "XXH-2", title: "Loose" }),
     ]);
-    expect(kernel.groupIssues(kernel.teamIssues(), "assignee").map((group) => group.label)).toEqual([
-      "Ada",
-      "No assignee",
-    ]);
+    expect(
+      kernel
+        .groupIssues(kernel.teamIssues(), "assignee")
+        .map((group) => group.label),
+    ).toEqual(["Ada", "No assignee"]);
   });
 
   test("grouping by project uses the Project name or No project", () => {
     const kernel = kernelWith(
-      [issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" }), issue({ id: "XXH-2", title: "Loose" })],
+      [
+        issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" }),
+        issue({ id: "XXH-2", title: "Loose" }),
+      ],
       { projects: [project({ id: "atlas", name: "Atlas" })] },
     );
-    expect(kernel.groupIssues(kernel.teamIssues(), "project").map((group) => group.label)).toEqual([
-      "Atlas",
-      "No project",
-    ]);
+    expect(
+      kernel
+        .groupIssues(kernel.teamIssues(), "project")
+        .map((group) => group.label),
+    ).toEqual(["Atlas", "No project"]);
   });
 
   test("grouping none returns a single unsectioned list", () => {
@@ -276,9 +329,12 @@ describe("Grouping on built-in lists", () => {
   });
 
   test("applying grouping to a built-in list does not persist a Custom View", () => {
-    const kernel = kernelWith([issue({ id: "XXH-1", title: "Item", priority: 1 })], {
-      views: [view({ id: "focus", name: "Focus", grouping: "status" })],
-    });
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "Item", priority: 1 })],
+      {
+        views: [view({ id: "focus", name: "Focus", grouping: "status" })],
+      },
+    );
     const stored = kernel.views()[0];
     kernel.groupIssues(kernel.teamIssues(), "priority");
     expect(kernel.views()).toEqual([stored]);
@@ -288,7 +344,9 @@ describe("Grouping on built-in lists", () => {
   test("every grouping word can be applied to Team Issues", () => {
     const kernel = kernelWith([issue({ id: "XXH-1", title: "Item" })]);
     for (const grouping of ISSUE_GROUPINGS satisfies readonly IssueGrouping[]) {
-      expect(kernel.groupIssues(kernel.teamIssues(), grouping).length).toBeGreaterThan(0);
+      expect(
+        kernel.groupIssues(kernel.teamIssues(), grouping).length,
+      ).toBeGreaterThan(0);
     }
   });
 });
@@ -306,14 +364,23 @@ describe("Project Issues membership", () => {
       ],
       { projects: [atlas, helix] },
     );
-    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual(["XXH-1"]);
-    expect(kernel.teamIssues().map((item) => item.id)).toEqual(["XXH-1", "XXH-2", "XXH-3"]);
+    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual([
+      "XXH-1",
+    ]);
+    expect(kernel.teamIssues().map((item) => item.id)).toEqual([
+      "XXH-1",
+      "XXH-2",
+      "XXH-3",
+    ]);
   });
 
   test("opening an Issue from Project Issues and from Team Issues is the same record", () => {
-    const kernel = kernelWith([issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" })], {
-      projects: [atlas],
-    });
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" })],
+      {
+        projects: [atlas],
+      },
+    );
     const fromProject = kernel.projectIssues("atlas")[0];
     const fromTeam = kernel.teamIssues()[0];
     expect(fromProject).toBe(fromTeam);
@@ -321,7 +388,9 @@ describe("Project Issues membership", () => {
   });
 
   test("a new Project is identified by a slug and starts in backlog with empty planning fields", () => {
-    const created = createKernel({ viewer, teamKey }).createProject({ name: "Atlas" });
+    const created = createKernel({ viewer, teamKey }).createProject({
+      name: "Atlas",
+    });
     expect(created.slugId).toBe("atlas");
     expect(created.id).toBe("atlas");
     expect(created.status).toBe("backlog");
@@ -333,13 +402,24 @@ describe("Project Issues membership", () => {
   });
 
   test("Project status is only backlog, planned, started, paused, completed, or canceled", () => {
-    expect(PROJECT_STATUSES).toEqual(["backlog", "planned", "started", "paused", "completed", "canceled"]);
+    expect(PROJECT_STATUSES).toEqual([
+      "backlog",
+      "planned",
+      "started",
+      "paused",
+      "completed",
+      "canceled",
+    ]);
   });
 
   test("an Issue belongs to at most one Project, and any Team Issue may join", () => {
-    const kernel = kernelWith([issue({ id: "XXH-1", title: "Move me" })], { projects: [atlas, helix] });
+    const kernel = kernelWith([issue({ id: "XXH-1", title: "Move me" })], {
+      projects: [atlas, helix],
+    });
     expect(kernel.updateIssue("XXH-1", { projectId: "atlas" }).ok).toBe(true);
-    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual(["XXH-1"]);
+    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual([
+      "XXH-1",
+    ]);
     expect(kernel.updateIssue("XXH-1", { projectId: "helix" }).ok).toBe(true);
     expect(kernel.getIssue("XXH-1")?.projectId).toBe("helix");
     expect(kernel.projectIssues("atlas")).toEqual([]);
@@ -349,7 +429,10 @@ describe("Project Issues membership", () => {
 
   test("creating an Issue from a Project defaults that Project; lists do not force one", () => {
     const kernel = kernelWith([], { projects: [atlas] });
-    const fromProject = kernel.createIssue({ title: "From project", projectId: "atlas" });
+    const fromProject = kernel.createIssue({
+      title: "From project",
+      projectId: "atlas",
+    });
     const fromList = kernel.createIssue({ title: "From list" });
     expect(fromProject.projectId).toBe("atlas");
     expect(fromList.projectId).toBeUndefined();
@@ -357,11 +440,22 @@ describe("Project Issues membership", () => {
   });
 
   test("Project Issues is not stored as a Custom View", () => {
-    const kernel = kernelWith([issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" })], {
-      projects: [atlas],
-      views: [view({ id: "atlas-query", name: "Atlas query", filter: { projectId: "atlas" } })],
-    });
-    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual(["XXH-1"]);
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "In Atlas", projectId: "atlas" })],
+      {
+        projects: [atlas],
+        views: [
+          view({
+            id: "atlas-query",
+            name: "Atlas query",
+            filter: { projectId: "atlas" },
+          }),
+        ],
+      },
+    );
+    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual([
+      "XXH-1",
+    ]);
     expect(kernel.views()).toHaveLength(1);
     expect(kernel.views()[0]?.id).toBe("atlas-query");
     expect(kernel.getProject("atlas")?.id).not.toBe(kernel.views()[0]?.id);
@@ -378,12 +472,27 @@ describe("Project progress and health", () => {
 
   test("all live Issues done is 100% and all in progress is 25%", () => {
     const done = kernelWith(
-      [issue({ id: "XXH-1", title: "Done", status: "done", projectId: "atlas", estimate: 2 })],
+      [
+        issue({
+          id: "XXH-1",
+          title: "Done",
+          status: "done",
+          projectId: "atlas",
+          estimate: 2,
+        }),
+      ],
       { projects: [atlas] },
     );
     expect(done.projectProgress("atlas").ratio).toBe(1);
     const started = kernelWith(
-      [issue({ id: "XXH-1", title: "Doing", status: "progress", projectId: "atlas" })],
+      [
+        issue({
+          id: "XXH-1",
+          title: "Doing",
+          status: "progress",
+          projectId: "atlas",
+        }),
+      ],
       { projects: [atlas] },
     );
     expect(started.projectProgress("atlas").ratio).toBe(0.25);
@@ -392,10 +501,33 @@ describe("Project progress and health", () => {
   test("unestimated live work counts as 1 point and explicit 0 counts as 0; canceled is out of live scope", () => {
     const kernel = kernelWith(
       [
-        issue({ id: "XXH-1", title: "Done big", status: "done", projectId: "atlas", estimate: 3 }),
-        issue({ id: "XXH-2", title: "Unestimated todo", status: "todo", projectId: "atlas" }),
-        issue({ id: "XXH-3", title: "Zero", status: "todo", projectId: "atlas", estimate: 0 }),
-        issue({ id: "XXH-4", title: "Canceled", status: "canceled", projectId: "atlas", estimate: 8 }),
+        issue({
+          id: "XXH-1",
+          title: "Done big",
+          status: "done",
+          projectId: "atlas",
+          estimate: 3,
+        }),
+        issue({
+          id: "XXH-2",
+          title: "Unestimated todo",
+          status: "todo",
+          projectId: "atlas",
+        }),
+        issue({
+          id: "XXH-3",
+          title: "Zero",
+          status: "todo",
+          projectId: "atlas",
+          estimate: 0,
+        }),
+        issue({
+          id: "XXH-4",
+          title: "Canceled",
+          status: "canceled",
+          projectId: "atlas",
+          estimate: 8,
+        }),
       ],
       { projects: [atlas] },
     );
@@ -408,8 +540,20 @@ describe("Project progress and health", () => {
   test("progress is the formula with no 99% cap", () => {
     const kernel = kernelWith(
       [
-        issue({ id: "XXH-1", title: "Almost", status: "done", projectId: "atlas", estimate: 99 }),
-        issue({ id: "XXH-2", title: "Last", status: "todo", projectId: "atlas", estimate: 1 }),
+        issue({
+          id: "XXH-1",
+          title: "Almost",
+          status: "done",
+          projectId: "atlas",
+          estimate: 99,
+        }),
+        issue({
+          id: "XXH-2",
+          title: "Last",
+          status: "todo",
+          projectId: "atlas",
+          estimate: 1,
+        }),
       ],
       { projects: [atlas] },
     );
@@ -421,10 +565,26 @@ describe("Project progress and health", () => {
       viewer,
       teamKey,
       projects: [atlas],
-      milestones: [{ id: "ms-1", projectId: "atlas", name: "Ship", sortOrder: 1 }],
+      milestones: [
+        { id: "ms-1", projectId: "atlas", name: "Ship", sortOrder: 1 },
+      ],
       issues: [
-        issue({ id: "XXH-1", title: "Done", status: "done", projectId: "atlas", milestoneId: "ms-1", estimate: 3 }),
-        issue({ id: "XXH-2", title: "Todo", status: "todo", projectId: "atlas", milestoneId: "ms-1", estimate: 1 }),
+        issue({
+          id: "XXH-1",
+          title: "Done",
+          status: "done",
+          projectId: "atlas",
+          milestoneId: "ms-1",
+          estimate: 3,
+        }),
+        issue({
+          id: "XXH-2",
+          title: "Todo",
+          status: "todo",
+          projectId: "atlas",
+          milestoneId: "ms-1",
+          estimate: 1,
+        }),
       ],
     });
     expect(kernel.milestoneProgress("ms-1").ratio).toBe(0.75);
@@ -433,7 +593,14 @@ describe("Project progress and health", () => {
 
   test("no Project updates means no health; latest update wins; progress and health can disagree", () => {
     const kernel = kernelWith(
-      [issue({ id: "XXH-1", title: "Done", status: "done", projectId: "atlas" })],
+      [
+        issue({
+          id: "XXH-1",
+          title: "Done",
+          status: "done",
+          projectId: "atlas",
+        }),
+      ],
       { projects: [atlas] },
     );
     expect(kernel.projectHealth("atlas")).toBeUndefined();
@@ -451,7 +618,15 @@ describe("Project progress and health", () => {
       project({
         id: "atlas",
         name: "Atlas",
-        updates: [{ id: "u1", health: "atRisk", body: "Slip", author: viewer, time: "now" }],
+        updates: [
+          {
+            id: "u1",
+            health: "atRisk",
+            body: "Slip",
+            author: viewer,
+            time: "now",
+          },
+        ],
       }),
       { health: "onTrack" },
     );
@@ -464,27 +639,74 @@ describe("Project progress and health", () => {
 describe("Custom View saved query", () => {
   const atlas = project({ id: "atlas", name: "Atlas" });
   const catalog = [
-    issue({ id: "XXH-1", title: "Ada todo Focus", assignee: viewer, creator: viewer, status: "todo", labels: ["Focus"], projectId: "atlas", priority: 2, subscribed: true }),
-    issue({ id: "XXH-2", title: "Bo done Debt", assignee: "Bo", creator: "Bo", status: "done", labels: ["Debt"], priority: 0 }),
-    issue({ id: "XXH-3", title: "Ada progress", assignee: viewer, creator: "Bo", status: "progress", labels: ["Focus", "Debt"], subscribed: false, priority: 1 }),
+    issue({
+      id: "XXH-1",
+      title: "Ada todo Focus",
+      assignee: viewer,
+      creator: viewer,
+      status: "todo",
+      labels: ["Focus"],
+      projectId: "atlas",
+      priority: 2,
+      subscribed: true,
+    }),
+    issue({
+      id: "XXH-2",
+      title: "Bo done Debt",
+      assignee: "Bo",
+      creator: "Bo",
+      status: "done",
+      labels: ["Debt"],
+      priority: 0,
+    }),
+    issue({
+      id: "XXH-3",
+      title: "Ada progress",
+      assignee: viewer,
+      creator: "Bo",
+      status: "progress",
+      labels: ["Focus", "Debt"],
+      subscribed: false,
+      priority: 1,
+    }),
   ];
 
   test("an empty filter matches every Team Issue", () => {
-    const kernel = kernelWith(catalog, { views: [view({ id: "all", name: "All" })] });
-    expect(kernel.customViewIssues("all").map((item) => item.id)).toEqual(["XXH-1", "XXH-2", "XXH-3"]);
+    const kernel = kernelWith(catalog, {
+      views: [view({ id: "all", name: "All" })],
+    });
+    expect(kernel.customViewIssues("all").map((item) => item.id)).toEqual([
+      "XXH-1",
+      "XXH-2",
+      "XXH-3",
+    ]);
   });
 
   test("assigned, created, and subscribed use the same predicates as My Issues", () => {
     const kernel = kernelWith(catalog, {
       views: [
-        view({ id: "assigned", name: "Assigned", filter: { assignedToMe: true } }),
+        view({
+          id: "assigned",
+          name: "Assigned",
+          filter: { assignedToMe: true },
+        }),
         view({ id: "created", name: "Created", filter: { createdByMe: true } }),
-        view({ id: "watching", name: "Watching", filter: { subscribed: true } }),
+        view({
+          id: "watching",
+          name: "Watching",
+          filter: { subscribed: true },
+        }),
       ],
     });
-    expect(kernel.customViewIssues("assigned")).toEqual(kernel.myIssuesAssigned());
-    expect(kernel.customViewIssues("created")).toEqual(kernel.myIssuesCreated());
-    expect(kernel.customViewIssues("watching")).toEqual(kernel.myIssuesSubscribed());
+    expect(kernel.customViewIssues("assigned")).toEqual(
+      kernel.myIssuesAssigned(),
+    );
+    expect(kernel.customViewIssues("created")).toEqual(
+      kernel.myIssuesCreated(),
+    );
+    expect(kernel.customViewIssues("watching")).toEqual(
+      kernel.myIssuesSubscribed(),
+    );
   });
 
   test("statuses, project, labels, and priority each constrain membership", () => {
@@ -492,15 +714,28 @@ describe("Custom View saved query", () => {
       projects: [atlas],
       views: [
         view({ id: "todo", name: "Todo", filter: { statuses: ["todo"] } }),
-        view({ id: "atlas-issues", name: "Atlas issues", filter: { projectId: "atlas" } }),
+        view({
+          id: "atlas-issues",
+          name: "Atlas issues",
+          filter: { projectId: "atlas" },
+        }),
         view({ id: "focus", name: "Focus", filter: { labels: ["Focus"] } }),
         view({ id: "none", name: "No priority", filter: { priority: 0 } }),
       ],
     });
-    expect(kernel.customViewIssues("todo").map((item) => item.id)).toEqual(["XXH-1"]);
-    expect(kernel.customViewIssues("atlas-issues").map((item) => item.id)).toEqual(["XXH-1"]);
-    expect(kernel.customViewIssues("focus").map((item) => item.id)).toEqual(["XXH-1", "XXH-3"]);
-    expect(kernel.customViewIssues("none").map((item) => item.id)).toEqual(["XXH-2"]);
+    expect(kernel.customViewIssues("todo").map((item) => item.id)).toEqual([
+      "XXH-1",
+    ]);
+    expect(
+      kernel.customViewIssues("atlas-issues").map((item) => item.id),
+    ).toEqual(["XXH-1"]);
+    expect(kernel.customViewIssues("focus").map((item) => item.id)).toEqual([
+      "XXH-1",
+      "XXH-3",
+    ]);
+    expect(kernel.customViewIssues("none").map((item) => item.id)).toEqual([
+      "XXH-2",
+    ]);
   });
 
   test("filter fields AND together and unset fields do not constrain", () => {
@@ -509,15 +744,24 @@ describe("Custom View saved query", () => {
         view({
           id: "narrow",
           name: "Narrow",
-          filter: { assignedToMe: true, statuses: ["todo", "progress"], labels: ["Focus"] },
+          filter: {
+            assignedToMe: true,
+            statuses: ["todo", "progress"],
+            labels: ["Focus"],
+          },
         }),
       ],
     });
-    expect(kernel.customViewIssues("narrow").map((item) => item.id)).toEqual(["XXH-1", "XXH-3"]);
+    expect(kernel.customViewIssues("narrow").map((item) => item.id)).toEqual([
+      "XXH-1",
+      "XXH-3",
+    ]);
   });
 
   test("Issues that match a Custom View are the same records as Team Issues", () => {
-    const kernel = kernelWith(catalog, { views: [view({ id: "all", name: "All" })] });
+    const kernel = kernelWith(catalog, {
+      views: [view({ id: "all", name: "All" })],
+    });
     const fromView = kernel.customViewIssues("all")[0];
     expect(fromView).toBe(kernel.getIssue("XXH-1"));
     expect(fromView).toBe(kernel.teamIssues()[0]);
@@ -526,29 +770,56 @@ describe("Custom View saved query", () => {
   test("a Custom View whose filter names a Project remains a Custom View", () => {
     const kernel = kernelWith(catalog, {
       projects: [atlas],
-      views: [view({ id: "atlas-query", name: "Atlas query", filter: { projectId: "atlas" } })],
+      views: [
+        view({
+          id: "atlas-query",
+          name: "Atlas query",
+          filter: { projectId: "atlas" },
+        }),
+      ],
     });
-    expect(kernel.customViewIssues("atlas-query").map((item) => item.id)).toEqual(["XXH-1"]);
-    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual(["XXH-1"]);
-    expect(kernel.getCustomView("atlas-query")?.id).not.toBe(kernel.getProject("atlas")?.id);
+    expect(
+      kernel.customViewIssues("atlas-query").map((item) => item.id),
+    ).toEqual(["XXH-1"]);
+    expect(kernel.projectIssues("atlas").map((item) => item.id)).toEqual([
+      "XXH-1",
+    ]);
+    expect(kernel.getCustomView("atlas-query")?.id).not.toBe(
+      kernel.getProject("atlas")?.id,
+    );
     expect(kernel.getCustomView("atlas-query")?.filter.projectId).toBe("atlas");
   });
 
   test("a View filter names a Project by slug as membership", () => {
     const helix = project({ id: "proj-1", slugId: "helix", name: "Helix" });
     const kernel = kernelWith(
-      [issue({ id: "XXH-1", title: "In Helix", projectId: "proj-1" }), issue({ id: "XXH-2", title: "Loose" })],
+      [
+        issue({ id: "XXH-1", title: "In Helix", projectId: "proj-1" }),
+        issue({ id: "XXH-2", title: "Loose" }),
+      ],
       {
         projects: [helix],
-        views: [view({ id: "helix-query", name: "Helix query", filter: { projectId: "helix" } })],
+        views: [
+          view({
+            id: "helix-query",
+            name: "Helix query",
+            filter: { projectId: "helix" },
+          }),
+        ],
       },
     );
-    expect(kernel.customViewIssues("helix-query").map((item) => item.id)).toEqual(["XXH-1"]);
-    expect(kernel.customViewIssues("helix-query")).toEqual(kernel.projectIssues("helix"));
+    expect(
+      kernel.customViewIssues("helix-query").map((item) => item.id),
+    ).toEqual(["XXH-1"]);
+    expect(kernel.customViewIssues("helix-query")).toEqual(
+      kernel.projectIssues("helix"),
+    );
   });
 
   test("a new Custom View is Issue-only, slug-identified, private, with status grouping and list layout", () => {
-    const created = createKernel({ viewer, teamKey }).createCustomView({ name: "Focus work" });
+    const created = createKernel({ viewer, teamKey }).createCustomView({
+      name: "Focus work",
+    });
     expect(created.slugId).toBe("focus-work");
     expect(created.id).toBe("focus-work");
     expect(created.modelName).toBe("Issue");
@@ -561,7 +832,11 @@ describe("Custom View saved query", () => {
 
   test("stored grouping and layout survive; grouping a built-in list does not rewrite them", () => {
     const kernel = createKernel({ viewer, teamKey });
-    const created = kernel.createCustomView({ name: "Board", grouping: "priority", layout: "board" });
+    const created = kernel.createCustomView({
+      name: "Board",
+      grouping: "priority",
+      layout: "board",
+    });
     kernel.groupIssues(kernel.teamIssues(), "assignee");
     expect(kernel.getCustomView(created.id)?.grouping).toBe("priority");
     expect(kernel.getCustomView(created.id)?.layout).toBe("board");
@@ -611,21 +886,27 @@ describe("Custom View saved query", () => {
   });
 
   test("labels-only and statuses-only filters each produce one explanation line", () => {
-    expect(explainViewFilter({ labels: ["Focus"] }, viewer, []).lines).toEqual(["Label is Focus"]);
-    expect(explainViewFilter({ statuses: ["done"] }, viewer, []).lines).toEqual(["Status is Done"]);
+    expect(explainViewFilter({ labels: ["Focus"] }, viewer, []).lines).toEqual([
+      "Label is Focus",
+    ]);
+    expect(explainViewFilter({ statuses: ["done"] }, viewer, []).lines).toEqual(
+      ["Status is Done"],
+    );
   });
 
   test("a Project filter uses the Project name when present and the stored slug when missing", () => {
-    expect(explainViewFilter({ projectId: "atlas" }, viewer, [atlas]).lines).toEqual([
-      "Project is Atlas",
-    ]);
-    expect(explainViewFilter({ projectId: "gone-slug" }, viewer, [atlas]).lines).toEqual([
-      "Project is gone-slug",
-    ]);
+    expect(
+      explainViewFilter({ projectId: "atlas" }, viewer, [atlas]).lines,
+    ).toEqual(["Project is Atlas"]);
+    expect(
+      explainViewFilter({ projectId: "gone-slug" }, viewer, [atlas]).lines,
+    ).toEqual(["Project is gone-slug"]);
   });
 
   test("priority zero is explained as No priority, distinct from an unset priority field", () => {
-    expect(explainViewFilter({ priority: 0 }, viewer, []).lines).toEqual(["Priority is No priority"]);
+    expect(explainViewFilter({ priority: 0 }, viewer, []).lines).toEqual([
+      "Priority is No priority",
+    ]);
     expect(explainViewFilter({}, viewer, []).lines).toEqual([]);
   });
 });
@@ -633,15 +914,30 @@ describe("Custom View saved query", () => {
 describe("Milestone membership", () => {
   const atlas = project({ id: "atlas", name: "Atlas" });
   const helix = project({ id: "helix", name: "Helix" });
-  const ship = { id: "ms-ship", projectId: "atlas", name: "Ship", sortOrder: 1 };
-  const later = { id: "ms-later", projectId: "helix", name: "Later", sortOrder: 1 };
+  const ship = {
+    id: "ms-ship",
+    projectId: "atlas",
+    name: "Ship",
+    sortOrder: 1,
+  };
+  const later = {
+    id: "ms-later",
+    projectId: "helix",
+    name: "Later",
+    sortOrder: 1,
+  };
 
   test("setting a Milestone is allowed only when it belongs to the Issue’s Project", () => {
-    const kernel = kernelWith([issue({ id: "XXH-1", title: "Work", projectId: "atlas" })], {
-      projects: [atlas, helix],
-      milestones: [ship, later],
-    });
-    expect(kernel.updateIssue("XXH-1", { milestoneId: "ms-ship" }).ok).toBe(true);
+    const kernel = kernelWith(
+      [issue({ id: "XXH-1", title: "Work", projectId: "atlas" })],
+      {
+        projects: [atlas, helix],
+        milestones: [ship, later],
+      },
+    );
+    expect(kernel.updateIssue("XXH-1", { milestoneId: "ms-ship" }).ok).toBe(
+      true,
+    );
     expect(kernel.getIssue("XXH-1")?.milestoneId).toBe("ms-ship");
     const refused = kernel.updateIssue("XXH-1", { milestoneId: "ms-later" });
     expect(refused.ok).toBe(false);
@@ -661,7 +957,14 @@ describe("Milestone membership", () => {
 
   test("leaving a Project clears the Milestone", () => {
     const kernel = kernelWith(
-      [issue({ id: "XXH-1", title: "Work", projectId: "atlas", milestoneId: "ms-ship" })],
+      [
+        issue({
+          id: "XXH-1",
+          title: "Work",
+          projectId: "atlas",
+          milestoneId: "ms-ship",
+        }),
+      ],
       { projects: [atlas], milestones: [ship] },
     );
     expect(kernel.updateIssue("XXH-1", { projectId: null }).ok).toBe(true);
@@ -671,7 +974,14 @@ describe("Milestone membership", () => {
 
   test("a title change does not clear a Milestone", () => {
     const kernel = kernelWith(
-      [issue({ id: "XXH-1", title: "Work", projectId: "atlas", milestoneId: "ms-ship" })],
+      [
+        issue({
+          id: "XXH-1",
+          title: "Work",
+          projectId: "atlas",
+          milestoneId: "ms-ship",
+        }),
+      ],
       { projects: [atlas], milestones: [ship] },
     );
     expect(kernel.updateIssue("XXH-1", { title: "Renamed" }).ok).toBe(true);
@@ -680,7 +990,14 @@ describe("Milestone membership", () => {
 
   test("moving an Issue to another Project clears a Milestone that belongs only to the old Project", () => {
     const kernel = kernelWith(
-      [issue({ id: "XXH-1", title: "Work", projectId: "atlas", milestoneId: "ms-ship" })],
+      [
+        issue({
+          id: "XXH-1",
+          title: "Work",
+          projectId: "atlas",
+          milestoneId: "ms-ship",
+        }),
+      ],
       { projects: [atlas, helix], milestones: [ship, later] },
     );
     expect(kernel.updateIssue("XXH-1", { projectId: "helix" }).ok).toBe(true);
@@ -690,7 +1007,11 @@ describe("Milestone membership", () => {
 
   test("a parent Issue does not force children into the same Project or Milestone", () => {
     const kernel = kernelWith([], { projects: [atlas], milestones: [ship] });
-    const parent = kernel.createIssue({ title: "Parent", projectId: "atlas", milestoneId: "ms-ship" });
+    const parent = kernel.createIssue({
+      title: "Parent",
+      projectId: "atlas",
+      milestoneId: "ms-ship",
+    });
     const child = kernel.createIssue({ title: "Child", parentId: parent.id });
     expect(parent.projectId).toBe("atlas");
     expect(parent.milestoneId).toBe("ms-ship");
@@ -701,7 +1022,10 @@ describe("Milestone membership", () => {
 
   test("create does not attach a Milestone that the Issue’s Project does not own", () => {
     const kernel = kernelWith([], { projects: [atlas], milestones: [ship] });
-    const loose = kernel.createIssue({ title: "Loose", milestoneId: "ms-ship" });
+    const loose = kernel.createIssue({
+      title: "Loose",
+      milestoneId: "ms-ship",
+    });
     expect(loose.projectId).toBeUndefined();
     expect(loose.milestoneId).toBeUndefined();
   });
@@ -712,9 +1036,14 @@ describe("Issue field updates", () => {
     const kernel = createKernel({ viewer, teamKey });
     const parent = kernel.createIssue({ title: "Parent" });
     const child = kernel.createIssue({ title: "Child" });
-    expect(kernel.updateIssue(child.id, { assignee: viewer, subscribed: true, estimate: 2, parentId: parent.id }).ok).toBe(
-      true,
-    );
+    expect(
+      kernel.updateIssue(child.id, {
+        assignee: viewer,
+        subscribed: true,
+        estimate: 2,
+        parentId: parent.id,
+      }).ok,
+    ).toBe(true);
     const stored = kernel.getIssue(child.id);
     expect(stored?.assignee).toBe(viewer);
     expect(stored?.subscribed).toBe(true);
@@ -722,4 +1051,3 @@ describe("Issue field updates", () => {
     expect(stored?.parentId).toBe(parent.id);
   });
 });
-
