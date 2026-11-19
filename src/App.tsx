@@ -301,9 +301,9 @@ function Shell({initialSession}:{initialSession?:unknown}) {
     let timer: ReturnType<typeof setInterval> | undefined, release: (() => void) | undefined;
     const controller = new AbortController();
     if (navigator.locks) void navigator.locks.request("linear-replica:automation", {signal:controller.signal}, () => new Promise<void>(resolve => {
-      release=resolve; timer=setInterval(()=>{if(workspace.saveState==="saved")workspace.tick();},60000);
+      release=resolve; timer=setInterval(()=>{if(!workspace.hosted && workspace.saveState==="saved")workspace.tick();},60000);
     })).catch(()=>{});
-    else timer=setInterval(()=>{if(document.hasFocus()&&workspace.saveState==="saved")workspace.tick();},60000);
+    else timer=setInterval(()=>{if(!workspace.hosted && document.hasFocus()&&workspace.saveState==="saved")workspace.tick();},60000);
     return () => { if(timer)clearInterval(timer); release?.(); controller.abort(); };
   }, [workspace]);
   const team = currentTeam(data);

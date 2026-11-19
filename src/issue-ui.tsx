@@ -746,7 +746,7 @@ export function IssueComposer({
           New issue <span className="r-push" />
           <Button onClick={onClose}>Save as draft</Button>
         </div>
-        {data.templates.some(template=>!template.deletedAt) && <div className="r-inline r-template-choice"><Choice label="Fill blank fields from template" value="" options={[{value:"",label:"Use template…"},...data.templates.filter(template=>!template.deletedAt).map(template=>({value:template.id,label:template.name}))]} onChange={id=>{if(id)try{workspace.applyIssueTemplate(id);setError("");}catch(error){setError(error instanceof Error?error.message:String(error));}}}/></div>}
+        {data.templates.some(template=>!template.deletedAt && (!template.teamKey || template.teamKey === currentTeam(data).key)) && <div className="r-inline r-template-choice"><Choice label="Fill blank fields from template" value="" options={[{value:"",label:"Use template…"},...data.templates.filter(template=>!template.deletedAt && (!template.teamKey || template.teamKey === currentTeam(data).key)).map(template=>({value:template.id,label:template.name}))]} onChange={id=>{if(id)try{workspace.applyIssueTemplate(id);setError("");}catch(error){setError(error instanceof Error?error.message:String(error));}}}/></div>}
         {draft.relation && <div className="r-composer-relation" role="status">
           <span>{({related:"Related to", "blocked-by":"Blocking", blocking:"Blocked by", parent:"Sub-issue of", child:"Parent of"})[draft.relation.mode]} {draft.relation.issueId} · {data.issues.find(issue => issue.id === draft.relation?.issueId)?.title ?? "Unavailable issue"}</span>
           <IconButton label="Remove draft relationship" onClick={() => patch({relation: undefined})}><I.CloseIcon /></IconButton>

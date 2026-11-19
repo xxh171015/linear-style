@@ -6,7 +6,7 @@ export type Role="admin"|"member";
 export class HTTPError extends Error { status:number; constructor(status:number,message:string){super(message);this.status=status;} }
 type Wire=Omit<WorkspaceData,"attachments">&{attachments:Record<string,unknown>[]};
 const personalKeys=["inbox","chats","draft","preferences","projectPreferences","favorites"] as const;
-function split(data:Wire) {
+export function split(data:Wire) {
   const privateOwners=new Set(["draft","agent-draft",...data.chats.map(chat=>chat.id)]);
   const personal:Record<string,unknown>={};
   for(const key of personalKeys)personal[key]=data[key];
@@ -18,7 +18,16 @@ function split(data:Wire) {
   for(const key of personalKeys)delete shared[key];
   return {shared,personal};
 }
-function blankPersonal() {return {inbox:[],chats:[],draft:{title:"",body:"",status:"backlog",priority:0,labels:[]},preferences:{},projectPreferences:{},favorites:[],attachments:[],issueSubscriptions:[],settings:{weekStartsOn:1,currentTeamKey:"XXH"}};}
+export function blankPersonal() {return {inbox:[],chats:[],draft:{title:"",body:"",status:"backlog",priority:0,labels:[]},preferences:{},projectPreferences:{},favorites:[],attachments:[],issueSubscriptions:[],settings:{weekStartsOn:1,currentTeamKey:"XXH"}};}
+export function hydrateShared(shared:Record<string,unknown>,personal:ReturnType<typeof blankPersonal>=blankPersonal(),user="Workspace") {
+  const sharedAttachments=Array.isArray(shared.attachments)?shared.attachments:[];
+  return {
+    ...shared,
+    ...personal,
+    attachments:[...sharedAttachments,...personal.attachments],
+    settings:{...(shared.settings as object),...personal.settings,user},
+  };
+}
 
 /** The legacy workspaces.user_id column is retained as a stable workspace ID. */
 export function workspaceService(db:DatabaseSync) {
@@ -81,10 +90,13 @@ export function workspaceService(db:DatabaseSync) {
       db.prepare("INSERT INTO workspace_personal VALUES(?,?,?) ON CONFLICT(workspace_id,user_id) DO UPDATE SET data=excluded.data").run(workspaceId,userId,JSON.stringify(personal));
       const known=new Set((JSON.parse(row.data).activity as WorkspaceData["activity"]).map(item=>item.id));
       const added=data.activity.filter(item=>!known.has(item.id));
+      const confirmations=(personal.inbox as {id:string;kind?:string}[]).filter(item=>item.kind==="confirmation");
       for(const other of db.prepare("SELECT p.user_id,p.data FROM workspace_personal p JOIN workspace_members m ON m.workspace_id=p.workspace_id AND m.user_id=p.user_id WHERE p.workspace_id=? AND p.user_id<>?").all(workspaceId,userId)) {
         const stored=JSON.parse(String(other.data));
         const notifications=added.filter(event=>stored.issueSubscriptions?.includes(event.issueId)).map(event=>({id:`notification-${randomBytes(16).toString("hex")}`,issueId:event.issueId,text:event.text,time:event.time,read:false}));
-        if(notifications.length){stored.inbox.unshift(...notifications);db.prepare("UPDATE workspace_personal SET data=? WHERE workspace_id=? AND user_id=?").run(JSON.stringify(stored),workspaceId,String(other.user_id));}
+        const have=new Set((stored.inbox as {id:string}[]).map(item=>item.id));
+        const copied=confirmations.filter(item=>!have.has(item.id)).map(item=>({...item,read:false}));
+        if(notifications.length||copied.length){stored.inbox.unshift(...copied,...notifications);db.prepare("UPDATE workspace_personal SET data=? WHERE workspace_id=? AND user_id=?").run(JSON.stringify(stored),workspaceId,String(other.user_id));}
       }
       db.exec("COMMIT");
     }catch(error){db.exec("ROLLBACK");throw error;}
@@ -116,11 +128,51 @@ export function workspaceService(db:DatabaseSync) {
   }
   function cancel(workspaceId:string,userId:string,id:string){admin(workspaceId,userId);if(!db.prepare("DELETE FROM workspace_invitations WHERE id=? AND workspace_id=?").run(id,workspaceId).changes)throw new HTTPError(404,"Invitation not found.");}
   function decline(id:string,email:string){if(!db.prepare("DELETE FROM workspace_invitations WHERE id=? AND email=?").run(id,email).changes)throw new HTTPError(404,"Invitation not found.");}
+  function personalData(workspaceId:string,userId:string) {
+    const row=db.prepare("SELECT data FROM workspace_personal WHERE workspace_id=? AND user_id=?").get(workspaceId,userId) as {data:string}|undefined;
+    return row?JSON.parse(row.data):blankPersonal();
+  }
+  function savePersonal(workspaceId:string,userId:string,data:unknown) {
+    db.prepare("INSERT INTO workspace_personal VALUES(?,?,?) ON CONFLICT(workspace_id,user_id) DO UPDATE SET data=excluded.data").run(workspaceId,userId,JSON.stringify(data));
+  }
+  function archiveInboxItem(workspaceId:string,id:string) {
+    for(const row of db.prepare("SELECT user_id FROM workspace_members WHERE workspace_id=?").all(workspaceId) as {user_id:string}[]) {
+      const stored=personalData(workspaceId,row.user_id);
+      const item=(stored.inbox as {id:string;archivedAt?:string;read?:boolean}[]).find(entry=>entry.id===id);
+      if(!item)continue;
+      item.archivedAt=new Date().toISOString();
+      item.read=true;
+      savePersonal(workspaceId,row.user_id,stored);
+    }
+  }
+  function fanOutInbox(workspaceId:string,items:{id:string}[]) {
+    if(!items.length)return;
+    for(const row of db.prepare("SELECT user_id FROM workspace_members WHERE workspace_id=?").all(workspaceId) as {user_id:string}[]) {
+      const stored=personalData(workspaceId,row.user_id);
+      const have=new Set((stored.inbox as {id:string}[]).map(item=>item.id));
+      const copied=items.filter(item=>!have.has(item.id)).map(item=>({...item,read:false}));
+      if(copied.length){stored.inbox.unshift(...copied);savePersonal(workspaceId,row.user_id,stored);}
+    }
+  }
+  function bumpRevision(workspaceId:string) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const row=db.prepare("SELECT data,revision FROM workspaces WHERE user_id=?").get(workspaceId) as {data:string;revision:number}|undefined;
+      if(!row)throw new HTTPError(404,"Workspace not found.");
+      const data=JSON.parse(row.data) as {revision?:number};
+      const revision=row.revision+1;
+      data.revision=revision;
+      const updated=db.prepare("UPDATE workspaces SET revision=?,data=? WHERE user_id=? AND revision=?").run(revision,JSON.stringify(data),workspaceId,row.revision);
+      if(updated.changes!==1)throw new HTTPError(409,"The workspace changed in another session.");
+      db.exec("COMMIT");
+      return revision;
+    }catch(error){db.exec("ROLLBACK");throw error;}
+  }
   function updateMember(workspaceId:string,actorId:string,memberId:string,role:Role|undefined) {
     admin(workspaceId,actorId);const target=membership(workspaceId,memberId);
     if(target.role==="admin"&&role!=="admin"&&Number(db.prepare("SELECT count(*) AS n FROM workspace_members WHERE workspace_id=? AND role='admin'").get(workspaceId)!.n)<=1)throw new HTTPError(409,"Keep at least one workspace admin.");
     if(role)db.prepare("UPDATE workspace_members SET role=? WHERE workspace_id=? AND user_id=?").run(role,workspaceId,memberId);
     else db.prepare("DELETE FROM workspace_members WHERE workspace_id=? AND user_id=?").run(workspaceId,memberId);
   }
-  return {initialize,membership,admin,summary,read,write,roster,invite,accept,cancel,decline,updateMember};
+  return {initialize,membership,admin,summary,read,write,roster,invite,accept,cancel,decline,updateMember,archiveInboxItem,fanOutInbox,bumpRevision};
 }

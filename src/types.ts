@@ -18,11 +18,27 @@ export type NavId =
 
 export type IssueTab = "assigned" | "created" | "subscribed" | "activity";
 
+/** Named states observed in the reference account; categories are separate. */
+export type IssueStatus =
+  | "backlog"
+  | "todo"
+  | "progress"
+  | "review"
+  | "done"
+  | "canceled"
+  | "duplicate"
+  | "triage";
+
 export type Team = {
   id: string;
   key: string;
   name: string;
   createdAt?: string;
+  cycleDurationDays?: number;
+  triageAcceptStatus?: IssueStatus;
+  triageDeclineStatus?: IssueStatus;
+  triageRotation?: string[];
+  triageRotationIndex?: number;
 };
 
 export type IssueLabel = {
@@ -41,17 +57,6 @@ export type Favorite = {
 };
 
 export type ProjectTab = "overview" | "activity" | "issues";
-
-/** Named states observed in the reference account; categories are separate. */
-export type IssueStatus =
-  | "backlog"
-  | "todo"
-  | "progress"
-  | "review"
-  | "done"
-  | "canceled"
-  | "duplicate"
-  | "triage";
 
 /** 0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low */
 export type Priority = 0 | 1 | 2 | 3 | 4;
@@ -126,8 +131,23 @@ export type Activity = {
   author?: string;
 };
 
+export type ConfirmationAction =
+  | "coding-session"
+  | "approve"
+  | "request-changes"
+  | "merge"
+  | "comment";
+
+export type ConfirmationRequest = {
+  action: ConfirmationAction;
+  issueId?: string;
+  reviewId?: string;
+  loopRunId?: string;
+  body?: string;
+};
+
 export type InboxItem = {
-  kind?: "reminder";
+  kind?: "reminder" | "confirmation";
   id: string;
   issueId: string;
   text: string;
@@ -135,7 +155,14 @@ export type InboxItem = {
   read: boolean;
   archivedAt?: string;
   snoozedUntil?: string;
+  confirmation?: ConfirmationRequest;
 };
+
+export type ReviewComment = { id: string; author: string; body: string; time: string; githubId?: number };
+
+export type ReviewCheck = { name: string; state: string };
+
+export type ReviewFile = { filename: string; status: string; patch?: string };
 
 export type Review = {
   id: string;
@@ -147,7 +174,10 @@ export type Review = {
   reviewers?: string[];
   url?: string;
   diff?: string;
-  comments?: { id: string; author: string; body: string; time: string }[];
+  comments?: ReviewComment[];
+  github?: { owner: string; repo: string; number: number; headSha?: string };
+  checks?: ReviewCheck[];
+  files?: ReviewFile[];
 };
 
 export type ProjectMilestone = {
@@ -332,7 +362,8 @@ export type LoopAction =
   | "assign-owner"
   | "raise-priority"
   | "coding-session"
-  | "slack-reply";
+  | "slack-reply"
+  | "merge";
 export type Loop = {
   id: string;
   name: string;
@@ -350,9 +381,25 @@ export type LoopRun = {
   id: string;
   loopId: string;
   time: string;
-  status: "completed" | "limited" | "failed";
+  status: "completed" | "limited" | "failed" | "pending";
   result: string;
   issueIds: string[];
+  periodStart?: string;
+  triggerIssueId?: string;
+  triggerActivityId?: string;
+  confirmationId?: string;
+};
+
+export type CodingSession = {
+  id: string;
+  issueId: string;
+  argv: string[];
+  cwd: string;
+  status: "running" | "completed" | "failed" | "limited";
+  startedAt: string;
+  endedAt?: string;
+  log: string;
+  confirmationId?: string;
 };
 export type IssueCreationRelation = {
   issueId: string;
@@ -374,6 +421,7 @@ export type IssueDraft = {
   teamKey?: string;
   estimate?: number;
   dueDate?: string;
+  templateId?: string;
 };
 
 
@@ -389,9 +437,21 @@ export type WorkspaceDocument = {
   deletedAt?:string;
 };
 
+export type TemplateRequiredField = "priority" | "assignee" | "project" | "status";
+
 export type IssueTemplate = {
   id:string;
   name:string;
   fields:Omit<IssueDraft,"relation"|"parentId">;
   deletedAt?:string;
+  teamKey?:string;
+  required?:TemplateRequiredField[];
+};
+
+export type ConnectionKind = "github" | "model" | "coding";
+
+export type ConnectionStatus = {
+  github?: { connected: boolean; repos: string[]; login?: string };
+  model?: { connected: boolean; baseUrl?: string; model?: string };
+  coding?: { configured: boolean; argv?: string[]; cwd?: string };
 };

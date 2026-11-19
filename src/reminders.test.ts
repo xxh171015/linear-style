@@ -40,6 +40,17 @@ test("scheduled reminders survive backup restore, become unread exactly when due
   expect(inInboxFolder(item,"inbox",due+1)).toBe(true);
   expect(w.getSnapshot().issues.find(i=>i.id===source.id)).toEqual(source);
 });
+test("tick does not mutate Issues when a reminder or due date is reached",()=>{
+  const w=new Workspace(initialData()),id=w.getSnapshot().issues[0].id;
+  w.updateIssue(id,{dueDate:"2026-11-01"},"set due date");
+  const due=Date.now()+3600000;
+  w.scheduleIssueReminder(id,new Date(due).toISOString());
+  const before=structuredClone(w.getSnapshot().issues.find(issue=>issue.id===id));
+  w.tick(new Date(due+1));
+  expect(w.getSnapshot().issues.find(issue=>issue.id===id)).toEqual(before);
+  const reminder=w.getSnapshot().inbox.find(item=>item.kind==="reminder")!;
+  expect(inInboxFolder(reminder,"inbox",due+1)).toBe(true);
+});
 test("reschedule replaces pending delivery, cancel archives it, failures publish no partial notification",()=>{
   const w=new Workspace(initialData()),id=w.getSnapshot().issues[0].id;
   const first=w.scheduleIssueReminder(id,new Date(Date.now()+3600000).toISOString());

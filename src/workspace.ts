@@ -8,6 +8,13 @@ import {
 import { DEFAULT_PROJECT_DISPLAY, scheduleDates, type ProjectDisplay } from "./timeline";
 import { canonicalPair, relationKey, validateRelations, type Relation, type RelationScope, type IssueRelationMode } from "./relations";
 import {
+  advanceCycles,
+  eventAlreadyRan,
+  intervalBlocked,
+  nextRotationAssignee,
+  periodStart,
+} from "./jobs";
+import {
   createKernel,
   estimateProgress,
   ISSUE_STATUSES,
@@ -36,6 +43,7 @@ import type {
   Activity,
   AgentChat,
   Attachment,
+  CodingSession,
   CustomView,
   CustomViewFilter,
   Cycle,
@@ -51,6 +59,7 @@ import type {
   Loop,
   LoopRun,
   Project,
+  TemplateRequiredField,
   ProjectViewFilter,
   ProjectMilestone,
   Review,
@@ -235,6 +244,7 @@ export type WorkspaceData = {
   chats: AgentChat[];
   loops: Loop[];
   runs: LoopRun[];
+  codingSessions: CodingSession[];
   draft: IssueDraft;
   preferences: Record<string, DisplayPreferences>;
   projectPreferences: Record<string, ProjectDisplay>;
@@ -306,6 +316,7 @@ export function initialData(): WorkspaceData {
     chats: [],
     loops: [],
     runs: [],
+    codingSessions: [],
     draft: emptyDraft(),
     preferences: {},
     projectPreferences: {},
@@ -318,10 +329,22 @@ export function initialData(): WorkspaceData {
   };
 }
 const validReaction=(emoji:string)=>emoji.trim()===emoji && [...emoji].length<=12 && /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20e3]/u.test(emoji) && !/\s/u.test(emoji);
+const TEMPLATE_REQUIRED: TemplateRequiredField[] = ["priority", "assignee", "project", "status"];
+function missingRequiredTemplateField(required: TemplateRequiredField[] | undefined, input: { priority?: number; assignee?: string | null; projectId?: string; status?: string }) {
+  for (const field of required ?? []) {
+    if (!TEMPLATE_REQUIRED.includes(field)) continue;
+    if (field === "priority" && !input.priority) return "priority";
+    if (field === "assignee" && !input.assignee?.trim()) return "assignee";
+    if (field === "project" && !input.projectId) return "project";
+    if (field === "status" && !input.status) return "status";
+  }
+}
 function validateIssueTemplate(template:import("./types").IssueTemplate,data:WorkspaceData) {
     const fields=template.fields;
     if(typeof template.name!=="string" || !fields || typeof fields.title!=="string" || typeof fields.body!=="string" || !ISSUE_STATUSES.includes(fields.status) || ![0,1,2,3,4].includes(fields.priority) || !Array.isArray(fields.labels) || fields.labels.some(label=>typeof label!=="string") ||
       (template.deletedAt!==undefined && (typeof template.deletedAt!=="string" || !Number.isFinite(Date.parse(template.deletedAt)))) ||
+      (template.teamKey!==undefined && !TEAM_KEY_PATTERN.test(String(template.teamKey).toUpperCase())) ||
+      (template.required!==undefined && (!Array.isArray(template.required) || template.required.some(field=>!["priority","assignee","project","status"].includes(field)))) ||
       "relation" in fields || "parentId" in fields ||
       (fields.projectId && !data.projects.some(project=>project.id===fields.projectId)) ||
       (fields.cycleId && !data.cycles.some(cycle=>cycle.id===fields.cycleId)) ||
@@ -348,7 +371,24 @@ export function migrateData(input: unknown): WorkspaceData {
         const key = String(team.key ?? "").toUpperCase();
         const name = String(team.name ?? "").trim();
         if (!id || !TEAM_KEY_PATTERN.test(key) || !name) throw Error("Saved teams are invalid.");
-        return { id, key, name, createdAt: typeof team.createdAt === "string" ? team.createdAt : undefined };
+        const duration = Number(team.cycleDurationDays);
+        const rotation = Array.isArray(team.triageRotation)
+          ? team.triageRotation.filter((item): item is string => typeof item === "string" && item.trim() !== "")
+          : undefined;
+        const accept = team.triageAcceptStatus;
+        const decline = team.triageDeclineStatus;
+        const rotationIndex = Number(team.triageRotationIndex);
+        return {
+          id,
+          key,
+          name,
+          createdAt: typeof team.createdAt === "string" ? team.createdAt : undefined,
+          cycleDurationDays: Number.isInteger(duration) && duration > 0 && duration <= 366 ? duration : undefined,
+          triageAcceptStatus: ISSUE_STATUSES.includes(accept as Issue["status"]) ? accept as Issue["status"] : undefined,
+          triageDeclineStatus: ISSUE_STATUSES.includes(decline as Issue["status"]) ? decline as Issue["status"] : undefined,
+          triageRotation: rotation?.length ? rotation : undefined,
+          triageRotationIndex: Number.isInteger(rotationIndex) && rotationIndex >= 0 ? rotationIndex : undefined,
+        };
       })
     : [{ ...DEFAULT_TEAM }];
   if (!result.settings || typeof result.settings !== "object") result.settings = { ...defaults.settings };
@@ -378,6 +418,7 @@ export function migrateData(input: unknown): WorkspaceData {
       teamKey: result.teams[0].key,
     }));
   }
+  if (!Array.isArray(result.codingSessions)) result.codingSessions = [];
   result.favorites = migrateFavorites(result.favorites);
   for (const issue of result.issues) {
     const key = String(issue.teamKey ?? "").toUpperCase();
@@ -403,6 +444,7 @@ export function migrateData(input: unknown): WorkspaceData {
     "chats",
     "loops",
     "runs",
+    "codingSessions",
     "relations",
     "teams",
     "labels",
@@ -454,7 +496,8 @@ export function migrateData(input: unknown): WorkspaceData {
   for (const item of result.inbox) {
     if (typeof item.issueId !== "string" || typeof item.text !== "string" ||
       typeof item.time !== "string" || typeof item.read !== "boolean" ||
-      (item.kind !== undefined && item.kind !== "reminder") ||
+      (item.kind !== undefined && item.kind !== "reminder" && item.kind !== "confirmation") ||
+      (item.kind === "confirmation" && (!item.confirmation || !["coding-session","approve","request-changes","merge","comment"].includes(item.confirmation.action))) ||
       [item.archivedAt, item.snoozedUntil].some(value => value !== undefined &&
         (typeof value !== "string" || !Number.isFinite(Date.parse(value)))))
       throw Error("A saved notification is invalid.");
@@ -905,6 +948,9 @@ export class Workspace {
     this.data=migrateData(loaded);this.committedLocal=this.data;this.editSequence++;
     this.saveState="saved";this.saveError="";this.saveConflict=false;this.publish();
   }
+  get hosted() {
+    return Boolean(this.repository?.nextIssueIdentifier);
+  }
   getSnapshot = () => this.data;
   getActiveSnapshot = () => {
     if (this.activeSource !== this.data) {
@@ -1094,9 +1140,15 @@ export class Workspace {
       });
   }
   createIssue(
-    input: CreateIssueInput & Partial<Pick<Issue, "cycleId" | "dueDate">> & { relation?: IssueCreationRelation },
+    input: CreateIssueInput & Partial<Pick<Issue, "cycleId" | "dueDate">> & { relation?: IssueCreationRelation; templateId?: string },
     attachmentOwner?: string,
   ): Issue {
+    if (input.templateId) {
+      const template = this.data.templates.find((item) => item.id === input.templateId && !item.deletedAt);
+      if (!template) throw Error("Template not found.");
+      const missing = missingRequiredTemplateField(template.required, input);
+      if (missing) throw Error(`Fill the required ${missing} field before creating the issue.`);
+    }
     if (!input.title.trim()) throw Error("An issue title is required.");
     if (
       input.estimate !== undefined &&
@@ -1293,21 +1345,37 @@ export class Workspace {
         { status: "duplicate", duplicateOfId: value, snoozedUntil: null },
         `marked as duplicate of ${value}`,
       );
-    } else
+    } else {
+      const issue = this.data.issues.find((item) => item.id === id)!;
+      const team = this.data.teams.find((item) => item.key === (issue.teamKey || currentTeam(this.data).key));
+      const status = action === "accept" ? team?.triageAcceptStatus ?? "backlog" : team?.triageDeclineStatus ?? "canceled";
+      let assignee: string | undefined;
+      if (action === "accept" && team?.triageRotation?.length)
+        this.mutate((d) => {
+          const live = d.teams.find((item) => item.id === team.id);
+          if (!live) return;
+          const rotated = nextRotationAssignee(live);
+          if (rotated) {
+            assignee = rotated.assignee;
+            live.triageRotationIndex = rotated.nextIndex;
+          }
+        });
       this.updateIssue(
         id,
         {
-          status: action === "accept" ? "backlog" : "canceled",
+          status,
           snoozedUntil: null,
+          ...(assignee ? { assignee } : {}),
         },
         action === "accept" ? "accepted from triage" : "declined from triage",
       );
+    }
   }
-  saveIssueTemplate(name:string,fields:import("./types").IssueTemplate["fields"],id=uid("template")) {
+  saveIssueTemplate(name:string,fields:import("./types").IssueTemplate["fields"],id=uid("template"),options?:{teamKey?:string;required?:TemplateRequiredField[]}) {
     if(!name.trim())throw Error("A template name is required.");
     const {relation:_relation,parentId:_parent,...safeFields}=fields as IssueDraft;
     this.mutate(d=>{
-      const template={id,name:name.trim(),fields:structuredClone(safeFields)};
+      const template={id,name:name.trim(),fields:structuredClone(safeFields),teamKey:options?.teamKey,required:options?.required};
       validateIssueTemplate(template,d);
       const existing=d.templates.findIndex(item=>item.id===id);
       if(existing>=0 && d.templates[existing].deletedAt)throw Error("Restore this template before editing it.");
@@ -1324,12 +1392,14 @@ export class Workspace {
   applyIssueTemplate(id:string) {
     this.mutate(d=>{
       const template=d.templates.find(item=>item.id===id && !item.deletedAt);if(!template)throw Error("Template not found.");
+      if(template.teamKey && template.teamKey !== currentTeam(d).key) throw Error("This template does not apply to the current Team.");
       const current=d.draft,fields=template.fields;
       d.draft={...fields,...current,title:current.title || fields.title,body:current.body || fields.body,
         priority:current.priority || fields.priority,status:current.status!=="backlog"?current.status:fields.status,
         projectId:current.projectId ?? fields.projectId,cycleId:current.cycleId ?? fields.cycleId,
         assignee:current.assignee ?? fields.assignee,milestoneId:current.milestoneId ?? fields.milestoneId,
         labels:[...new Set([...fields.labels,...current.labels])],
+        templateId:id,teamKey:current.teamKey ?? fields.teamKey ?? template.teamKey,
       };
       if(d.draft.milestoneId && !d.milestones.some(m=>m.id===d.draft.milestoneId && m.projectId===d.draft.projectId))delete d.draft.milestoneId;
     });
@@ -1512,11 +1582,12 @@ export class Workspace {
         : [...d.favorites, { id: `${kind}:${targetId}`, kind, targetId }];
     });
   }
-  runLoop(id: string, onlyIssueId?: string): LoopRun {
+  runLoop(id: string, onlyIssueId?: string, meta?: { activityId?: string; now?: Date }): LoopRun {
     let run!: LoopRun;
     this.mutate((d) => {
       const loop = d.loops.find((l) => l.id === id);
       if (!loop) throw Error("Loop not found.");
+      const now = meta?.now ?? new Date();
       let issues = d.issues.filter(
         (i) =>
           !i.deletedAt &&
@@ -1527,6 +1598,7 @@ export class Workspace {
         issues = issues.filter((i) => i.status === "triage");
       let result = "";
       let status: LoopRun["status"] = "completed";
+      let confirmationId: string | undefined;
       if (loop.action === "assign-owner") {
         const owner = loop.assignee ?? d.settings.user;
         issues = issues.filter((i) => !i.assignee);
@@ -1549,15 +1621,60 @@ export class Workspace {
           this.event(d, issue, "Loop set priority to High");
         }
         result = `Set ${issues.length} active issues with at least ${loop.minimumDemand ?? 2} duplicate reports to High priority.`;
-      } else if (
-        loop.action === "coding-session" ||
-        loop.action === "slack-reply"
-      ) {
+      } else if (loop.action === "slack-reply") {
         const outcome = this.services.automations.external(loop.action);
         status = outcome.status;
         result = outcome.message;
+      } else if (loop.action === "coding-session") {
+        if (!issues.length) result = "No issues in scope for a Coding session.";
+        else if (this.services.automations.codingConfigured?.()) {
+          status = "pending";
+          result = "Waiting for confirmation to start a Coding session.";
+          confirmationId = uid("inbox");
+          const issueId = onlyIssueId ?? issues[0].id;
+          d.inbox.unshift({
+            id: confirmationId,
+            issueId,
+            kind: "confirmation",
+            text: `Confirm Coding session for ${issueId}`,
+            time: stamp(),
+            read: false,
+            confirmation: { action: "coding-session", issueId, loopRunId: "" },
+          });
+        } else {
+          const outcome = this.services.automations.external(loop.action);
+          status = outcome.status;
+          result = outcome.message;
+        }
+      } else if (loop.action === "merge") {
+        if (!this.services.automations.githubConfigured?.()) {
+          status = "limited";
+          result = "GitHub writes require a connected GitHub service. No merge was sent.";
+        } else {
+          const review = d.reviews.find(
+            (item) => item.github && item.status !== "merged" && item.status !== "closed",
+          );
+          if (!review) result = "No connected Review in scope to merge.";
+          else {
+            status = "pending";
+            result = "Waiting for confirmation to merge.";
+            confirmationId = uid("inbox");
+            d.inbox.unshift({
+              id: confirmationId,
+              issueId: review.issueIds?.[0] ?? review.id,
+              kind: "confirmation",
+              text: `Confirm merge of ${review.title} as the Workspace GitHub PAT owner.`,
+              time: stamp(),
+              read: false,
+              confirmation: { action: "merge", reviewId: review.id, loopRunId: "" },
+            });
+          }
+        }
       } else result = summarizeIssues(issues, d);
       loop.lastRunAt = stamp();
+      const period = ["hourly", "daily", "weekly"].includes(loop.trigger)
+        ? periodStart(loop.trigger as "hourly" | "daily" | "weekly", now, d.settings.weekStartsOn)
+        : undefined;
       run = {
         id: uid("run"),
         loopId: id,
@@ -1565,7 +1682,15 @@ export class Workspace {
         status,
         result,
         issueIds: issues.map((i) => i.id),
+        periodStart: period,
+        triggerIssueId: onlyIssueId,
+        triggerActivityId: meta?.activityId,
+        confirmationId,
       };
+      if (confirmationId) {
+        const item = d.inbox.find((entry) => entry.id === confirmationId);
+        if (item?.confirmation) item.confirmation.loopRunId = run.id;
+      }
       d.runs.unshift(run);
     });
     return run;
@@ -1581,27 +1706,119 @@ export class Workspace {
     });
   }
   private trigger(trigger: Loop["trigger"], issueId: string) {
+    const activityId = this.data.activity.find((item) => item.issueId === issueId)?.id;
     for (const loop of this.data.loops.filter(
       (l) => l.enabled && l.trigger === trigger,
-    ))
-      this.runLoop(loop.id, issueId);
+    )) {
+      if (activityId && eventAlreadyRan(this.data.runs, loop.id, issueId, activityId)) continue;
+      this.runLoop(loop.id, issueId, { activityId });
+    }
   }
   tick(now = new Date()) {
+    const next = structuredClone(this.data);
+    if (advanceCycles(next, day(now)))
+      this.mutate((d) => {
+        advanceCycles(d, day(now));
+      });
     for (const loop of this.data.loops.filter(
       (l) => l.enabled && ["hourly", "daily", "weekly"].includes(l.trigger),
     )) {
-      const interval =
-        loop.trigger === "hourly"
-          ? 3600000
-          : loop.trigger === "daily"
-            ? 86400000
-            : 604800000;
-      if (
-        !loop.lastRunAt ||
-        now.getTime() - Date.parse(loop.lastRunAt) >= interval
-      )
-        this.runLoop(loop.id);
+      const period = periodStart(
+        loop.trigger as "hourly" | "daily" | "weekly",
+        now,
+        this.data.settings.weekStartsOn,
+      );
+      if (intervalBlocked(this.data.runs, loop.id, period, now.getTime())) continue;
+      this.runLoop(loop.id, undefined, { now });
     }
+  }
+  updateTeam(
+    key: string,
+    patch: Partial<Pick<import("./types").Team, "cycleDurationDays" | "triageAcceptStatus" | "triageDeclineStatus" | "triageRotation">>,
+  ) {
+    this.mutate((d) => {
+      const team = d.teams.find((item) => item.key === key);
+      if (!team) throw Error("Team not found.");
+      if (patch.cycleDurationDays !== undefined) {
+        if (!Number.isInteger(patch.cycleDurationDays) || patch.cycleDurationDays < 1 || patch.cycleDurationDays > 366)
+          throw Error("Cycle duration must be 1–366 days.");
+        team.cycleDurationDays = patch.cycleDurationDays;
+      }
+      if (patch.triageAcceptStatus !== undefined) {
+        if (!ISSUE_STATUSES.includes(patch.triageAcceptStatus)) throw Error("Choose an Issue status.");
+        team.triageAcceptStatus = patch.triageAcceptStatus;
+      }
+      if (patch.triageDeclineStatus !== undefined) {
+        if (!ISSUE_STATUSES.includes(patch.triageDeclineStatus)) throw Error("Choose an Issue status.");
+        team.triageDeclineStatus = patch.triageDeclineStatus;
+      }
+      if (patch.triageRotation !== undefined) {
+        team.triageRotation = patch.triageRotation.map((name) => name.trim()).filter(Boolean);
+        team.triageRotationIndex = 0;
+      }
+    });
+  }
+  private settleInboxConfirmation(
+    d: WorkspaceData,
+    id: string,
+    loopRunId: string | undefined,
+    status: LoopRun["status"],
+    result: string,
+    onlyPending = false,
+  ) {
+    const live = d.inbox.find((entry) => entry.id === id);
+    if (live) {
+      live.archivedAt = stamp();
+      live.read = true;
+    }
+    const run = d.runs.find((entry) => entry.id === loopRunId);
+    if (!run || (onlyPending && run.status !== "pending")) return;
+    run.status = status;
+    run.result = result;
+  }
+  confirmInbox(id: string) {
+    const item = this.data.inbox.find((entry) => entry.id === id);
+    if (!item || item.kind !== "confirmation" || !item.confirmation || item.archivedAt)
+      throw Error("Confirmation not found.");
+    const request = item.confirmation;
+    if (request.action === "coding-session") {
+      const issueId = request.issueId || item.issueId;
+      const started =
+        this.services.automations.startCodingSession?.(issueId) ??
+        this.services.automations.external("coding-session");
+      const status = started.status === "completed" ? "completed" : started.status === "limited" ? "limited" : "failed";
+      this.mutate((d) => {
+        this.settleInboxConfirmation(d, id, request.loopRunId, status, started.message);
+        d.codingSessions.unshift({
+          id: uid("coding"),
+          issueId,
+          argv: [],
+          cwd: "",
+          status,
+          startedAt: stamp(),
+          endedAt: stamp(),
+          log: started.log ?? started.message,
+          confirmationId: id,
+        });
+      });
+      return;
+    }
+    if (request.action === "approve" || request.action === "request-changes" || request.action === "merge") {
+      if (!request.reviewId) throw Error("Confirmation is missing a Review.");
+      this.transitionReview(request.reviewId, request.action);
+      this.mutate((d) => {
+        this.settleInboxConfirmation(d, id, request.loopRunId, "completed", `Review ${request.action} confirmed.`, true);
+      });
+      return;
+    }
+    throw Error("This Confirmation cannot be completed in the workspace.");
+  }
+  dismissConfirmation(id: string) {
+    this.mutate((d) => {
+      const item = d.inbox.find((entry) => entry.id === id && entry.kind === "confirmation");
+      if (!item) throw Error("Confirmation not found.");
+      this.settleInboxConfirmation(d, id, item.confirmation?.loopRunId, "failed", "Cancelled by a member.", true);
+    });
   }
 }
 export function summarizeIssues(issues: Issue[], data: WorkspaceData): string {

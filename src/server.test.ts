@@ -5,6 +5,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { Server } from "node:http";
 import { createReplicaServer } from "../server/app";
+import { tickWorkspaceRow } from "../server/scheduler";
 import { RemoteRepository } from "./remote-repository";
 import { encodeWorkspace } from "./workspace-wire";
 import { Workspace, DEFAULT_DISPLAY } from "./workspace";
@@ -237,4 +238,642 @@ test("revision pushes reach a different member account in the selected workspace
   const events=await b.request(`/api/events?workspace=${workspaceId}&account=${memberId}`,{signal:controller.signal}),reader=events.body!.getReader();await reader.read();const pushed=reader.read();
   const repo=new RemoteRepository(a.request),base=await repo.load(),w=new Workspace(base);w.createIssue({title:"Shared live update"});await repo.commit(w.getSnapshot(),base);
   expect(new TextDecoder().decode((await pushed).value)).toContain("data: 1");controller.abort();await reader.cancel().catch(()=>{});
+}));
+test("only admins paste GitHub tokens and members see a redacted Connection",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch;
+  globalThis.fetch=async(input,init)=>{
+    if(String(input)==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{status:200,headers:{"Content-Type":"application/json"}});
+    return original(input,init);
+  };
+  try {
+    expect((await b.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(403);
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    const status=await (await b.request("/api/connections",{headers})).json();
+    expect(status.github).toEqual({connected:true,repos:["acme/app"],login:"octocat"});
+    expect(JSON.stringify(status)).not.toContain("ghp_test");
+  } finally { globalThis.fetch=original; }
+}));
+test("admins paste, rotate and disconnect Connections while members see redacted status",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,githubCalls:string[]=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.startsWith("https://api.github.com")){
+      githubCalls.push(`${init?.method??"GET"} ${url}`);
+      const token=new Headers(init?.headers).get("Authorization")??"";
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:token.includes("ghp_rotated")?"mona":"octocat"}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${url}`);
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"",repos:[]})})).status).toBe(400);
+    expect((await b.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(403);
+    expect((await b.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-secret",baseUrl:"https://api.openai.com/v1",model:"gpt-4"})})).status).toBe(403);
+    const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-conn-"));
+    expect((await b.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["tool"],cwd})})).status).toBe(403);
+    const github=await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})});
+    expect(github.status).toBe(200);expect(await github.json()).toMatchObject({github:{connected:true,repos:["acme/app"],login:"octocat"}});
+    const githubRotated=await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_rotated",repos:["acme/web"]})});
+    expect(githubRotated.status).toBe(200);expect(await githubRotated.json()).toMatchObject({github:{connected:true,repos:["acme/web"],login:"mona"}});
+    const model=await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-secret",baseUrl:"https://api.openai.com/v1",model:"gpt-4"})});
+    expect(model.status).toBe(200);expect(await model.json()).toMatchObject({model:{connected:true,baseUrl:"https://api.openai.com/v1",model:"gpt-4"}});
+    const modelRotated=await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-rotated",baseUrl:"https://models.example/v1"})});
+    expect(modelRotated.status).toBe(200);expect(await modelRotated.json()).toMatchObject({model:{connected:true,baseUrl:"https://models.example/v1"}});
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["tool"],cwd:"relative"})})).status).toBe(400);
+    const coding=await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"{issueId}"],cwd})});
+    expect(coding.status).toBe(200);expect(await coding.json()).toMatchObject({coding:{configured:true,argv:[process.execPath,"{issueId}"],cwd}});
+    const codingRotated=await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["rotated"],cwd})});
+    expect(codingRotated.status).toBe(200);expect(await codingRotated.json()).toMatchObject({coding:{configured:true,argv:["rotated"],cwd}});
+    const status=await (await b.request("/api/connections",{headers})).json();
+    expect(status.github).toEqual({connected:true,repos:["acme/web"],login:"mona"});
+    expect(status.model).toEqual({connected:true,baseUrl:"https://models.example/v1"});
+    expect(status.coding).toEqual({configured:true,argv:["rotated"],cwd});
+    expect(status.coding).not.toHaveProperty("timeoutMs");
+    expect(JSON.stringify(status)).not.toContain("timeoutMs");
+    const leaked=JSON.stringify(status)+JSON.stringify(await (await b.request("/api/workspace",{headers})).json());
+    expect(leaked).not.toContain("ghp_test");expect(leaked).not.toContain("ghp_rotated");expect(leaked).not.toContain("sk-secret");expect(leaked).not.toContain("sk-rotated");
+    expect(githubCalls.every(line=>line==="GET https://api.github.com/user")).toBe(true);
+    expect(githubCalls.some(line=>/check/i.test(line))).toBe(false);
+    expect((await b.request("/api/connections/github",{method:"DELETE",headers})).status).toBe(403);
+    expect((await b.request("/api/connections/model",{method:"DELETE",headers})).status).toBe(403);
+    expect((await b.request("/api/connections/coding",{method:"DELETE",headers})).status).toBe(403);
+    expect((await a.request("/api/connections/github",{method:"DELETE",headers})).status).toBe(200);
+    expect((await a.request("/api/connections/model",{method:"DELETE",headers})).status).toBe(200);
+    expect((await a.request("/api/connections/coding",{method:"DELETE",headers})).status).toBe(200);
+    const empty=await (await b.request("/api/connections",{headers})).json();
+    expect(empty.github).toEqual({connected:false,repos:[]});
+    expect(empty.model).toEqual({connected:false});
+    expect(empty.coding).toEqual({configured:false});
+  } finally { globalThis.fetch=original; }
+}));
+test("GitHub Review sync stores a pull-request projection and refuses repos outside the allow list",async()=>fixture(async origin=>{
+  const c=client(origin);await c.register();
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.startsWith("https://api.github.com")){
+      calls.push(`${init?.method??"GET"} ${url}`);
+      if(url.includes("/pulls/")&&url.endsWith("/comments"))throw new Error("line comments are out of scope");
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
+      if(url.endsWith("/pulls/41"))return new Response(JSON.stringify({title:"Fix",user:{login:"octocat"},html_url:"https://github.com/acme/app/pull/41",merged:false,draft:false,state:"open",head:{sha:"abc"}}),{headers:{"Content-Type":"application/json"}});
+      if(url.endsWith("/files"))return new Response(JSON.stringify([{filename:"src/a.ts",status:"modified",patch:"+ok"}]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/issues/41/comments"))return new Response(JSON.stringify([{id:9,user:{login:"octocat"},body:"looks good",created_at:"2026-11-19T00:00:00Z"}]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/status"))return new Response(JSON.stringify({statuses:[{context:"ci",state:"success"}]}),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/actions/runs"))return new Response(JSON.stringify({workflow_runs:[{name:"Tests",conclusion:"success",head_sha:"abc"}]}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${url}`);
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await c.request("/api/connections/github",{method:"PUT",body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await c.request("/api/reviews/sync",{method:"POST",body:JSON.stringify({url:"https://github.com/other/app/pull/1"})})).status).toBe(403);
+    const synced=await c.request("/api/reviews/sync",{method:"POST",body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})});
+    expect(synced.status).toBe(200);
+    const reviews=await synced.json();
+    expect(reviews[0]).toMatchObject({title:"Fix",github:{owner:"acme",repo:"app",number:41}});
+    expect(reviews[0].diff).toContain("+ok");
+    expect(reviews[0].checks).toEqual(expect.arrayContaining([{name:"ci",state:"success"},{name:"Tests",state:"success"}]));
+    expect(reviews[0].comments).toEqual([expect.objectContaining({author:"octocat",body:"looks good"})]);
+    expect(calls.some(line=>line.includes("/issues/41/comments"))).toBe(true);
+    expect(calls.some(line=>line.includes("/commits/abc/status"))).toBe(true);
+    expect(calls.some(line=>line.includes("/actions/runs"))).toBe(true);
+    expect(calls.some(line=>line.includes("/pulls/41/comments"))).toBe(false);
+  } finally { globalThis.fetch=original; }
+}));
+function githubFetch(original:typeof fetch, calls:string[]) {
+  return async(input:RequestInfo|URL,init?:RequestInit)=>{
+    const url=String(input);
+    const method=init?.method??"GET";
+    calls.push(typeof init?.body==="string"?`${method} ${url} ${init.body}`:`${method} ${url}`);
+    if(url.includes("/pulls/")&&url.endsWith("/comments"))throw new Error("line comments are out of scope");
+    if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
+    if(url.endsWith("/pulls/41")&&(!init?.method||init.method==="GET"))return new Response(JSON.stringify({title:"Fix",user:{login:"octocat"},html_url:"https://github.com/acme/app/pull/41",merged:url.includes("unused"),draft:false,state:"open",head:{sha:"abc"}}),{headers:{"Content-Type":"application/json"}});
+    if(url.endsWith("/files"))return new Response(JSON.stringify([{filename:"src/a.ts",status:"modified",patch:"+ok"}]),{headers:{"Content-Type":"application/json"}});
+    if(url.includes("/issues/")&&url.endsWith("/comments")&&(!init?.method||init.method==="GET"))return new Response(JSON.stringify([]),{headers:{"Content-Type":"application/json"}});
+    if(url.includes("/issues/")&&url.endsWith("/comments")&&init?.method==="POST")return new Response(JSON.stringify({id:11,user:{login:"octocat"},body:"ship it",created_at:"2026-11-19T00:00:00Z"}),{headers:{"Content-Type":"application/json"}});
+    if(url.includes("/status"))return new Response(JSON.stringify({statuses:[]}),{headers:{"Content-Type":"application/json"}});
+    if(url.includes("/actions/runs"))return new Response(JSON.stringify({workflow_runs:[]}),{headers:{"Content-Type":"application/json"}});
+    if(url.endsWith("/merge")&&init?.method==="PUT")return new Response(JSON.stringify({merged:true,sha:"def"}),{headers:{"Content-Type":"application/json"}});
+    if(url.endsWith("/reviews")&&init?.method==="POST")return new Response(JSON.stringify({id:1}),{headers:{"Content-Type":"application/json"}});
+    return original(input,init);
+  };
+}
+function putMerge(calls:string[]) {return calls.filter(line=>line.startsWith("PUT ")&&line.includes("/merge"));}
+test("GitHub merge waits for Confirmation and still reaches a member without a personal snapshot",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    const rb=new RemoteRepository(b.request,undefined,workspaceId),bobBase=await rb.load(),replica=new Workspace(bobBase,rb);
+    const beforeRevision=replica.getSnapshot().revision;
+    expect(replica.getSnapshot().inbox.filter(item=>item.kind==="confirmation")).toEqual([]);
+    const merge=await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"merge"})});
+    expect(merge.status).toBe(200);expect(await merge.json()).toMatchObject({pending:true});
+    expect(putMerge(calls)).toEqual([]);
+    const aliceWorkspace=await (await a.request("/api/workspace",{headers})).json();
+    expect(aliceWorkspace.revision).toBeGreaterThan(beforeRevision);
+    const confirmation=aliceWorkspace.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(confirmation.kind).toBe("confirmation");
+    expect(confirmation.confirmation).toMatchObject({action:"merge",reviewId});
+    await replica.refreshShared();
+    expect(replica.getSnapshot().revision).toBe(aliceWorkspace.revision);
+    expect(replica.getSnapshot().inbox.find(item=>item.id===confirmation.id)?.confirmation).toMatchObject({action:"merge",reviewId});
+    replica.dispose();
+    expect((await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{id:string})=>item.id===confirmation.id).kind).toBe("confirmation");
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    expect(putMerge(calls)).toHaveLength(1);
+    expect(JSON.parse(putMerge(calls)[0].slice(putMerge(calls)[0].indexOf("{"))).merge_method).toBeUndefined();
+    const alice=(await (await a.request("/api/workspace",{headers})).json()).inbox.find((item:{id:string})=>item.id===confirmation.id);
+    expect(alice.archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("Approve and request-changes call GitHub immediately and are not Confirmations",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    expect((await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"approve"})})).status).toBe(200);
+    expect(calls.some(line=>line.startsWith("POST ")&&line.includes("/pulls/41/reviews")&&line.includes("APPROVE"))).toBe(true);
+    expect((await (await a.request("/api/workspace",{headers})).json()).reviews.find((item:{id:string})=>item.id===reviewId).approved).toBe(true);
+    expect((await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"request-changes"})})).status).toBe(200);
+    expect(calls.some(line=>line.startsWith("POST ")&&line.includes("/pulls/41/reviews")&&line.includes("REQUEST_CHANGES"))).toBe(true);
+    expect((await (await a.request("/api/workspace",{headers})).json()).reviews.find((item:{id:string})=>item.id===reviewId).approved).toBe(false);
+    expect(putMerge(calls)).toEqual([]);
+    const bob=(await (await b.request("/api/workspace",{headers})).json());
+    expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+  } finally { globalThis.fetch=original; }
+}));
+test("dismissing a merge Confirmation does not merge and fails an attached LoopRun",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    const merge=await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"merge"})});
+    expect(merge.status).toBe(200);
+    const confirmationId=(await merge.json()).confirmationId as string;
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{
+      d.runs.unshift({id:"run-wait",loopId:"github-write",time:new Date().toISOString(),status:"pending",result:"Waiting for confirmation.",issueIds:[],confirmationId});
+    });
+    await repo.commit(w.getSnapshot(),base);
+    expect((await b.request(`/api/inbox/${confirmationId}/dismiss`,{method:"POST",headers})).status).toBe(200);
+    expect(putMerge(calls)).toEqual([]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmationId).archivedAt).toBeTruthy();
+    expect(bob.runs.find((run:{id:string})=>run.id==="run-wait")).toMatchObject({status:"failed",result:"Cancelled by a member."});
+    const alice=await (await a.request("/api/workspace",{headers})).json();
+    expect(alice.inbox.find((item:{id:string})=>item.id===confirmationId).archivedAt).toBeTruthy();
+    expect(alice.runs.find((run:{id:string})=>run.id==="run-wait").status).toBe("failed");
+  } finally { globalThis.fetch=original; }
+}));
+test("Agent replies 409 without a model and a coding Loop Confirmation runs the host argv",async()=>fixture(async origin=>{
+  const {a,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  expect((await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"summarize"})})).status).toBe(409);
+  expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"k",baseUrl:"notaurl"})})).status).toBe(400);
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-ui-"));
+  expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd})})).status).toBe(200);
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];});
+  w.createIssue({title:"bug",status:"triage"});
+  await repo.commit(w.getSnapshot(),base);
+  const ran=await a.request("/api/loops/code/run",{method:"POST",headers});
+  expect(ran.status).toBe(200);expect(await ran.json()).toMatchObject({pending:true});
+  const confirmation=(await (await a.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+  expect(confirmation.confirmation.action).toBe("coding-session");
+  expect((await a.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+  const after=await (await a.request("/api/workspace",{headers})).json();
+  expect(after.codingSessions[0].log).toBe("ok");
+  expect(after.runs[0].status).toBe("completed");
+}));
+test("tickWorkspaceRow auto-creates Cycles and rolls incomplete Issues for a signed-in workspace",async()=>fixture(async(origin,database)=>{
+  const c=client(origin),created=await (await c.register()).json(),workspaceId=created.user.id as string;
+  const repo=new RemoteRepository(c.request),base=await repo.load(),w=new Workspace(base);
+  w.updateTeam("XXH",{cycleDurationDays:7,triageAcceptStatus:"todo",triageRotation:["Ada","Bea"]});
+  const templateId=w.saveIssueTemplate("Need assignee",{...w.getSnapshot().draft,title:"From template"},undefined,{required:["assignee"]});
+  w.mutate(d=>{
+    d.cycles=[{id:"c-ended",number:1,name:"Cycle 1",startDate:"2026-11-09",endDate:"2026-11-15",capacity:8,description:"",teamKey:"XXH"}];
+    d.loops=[];d.runs=[];
+  });
+  const review=w.createIssue({title:"carry",cycleId:"c-ended",status:"review"});
+  const done=w.createIssue({title:"kept",cycleId:"c-ended",status:"done"});
+  const triage=w.createIssue({title:"inbox",status:"triage"});
+  await repo.commit(w.getSnapshot(),base);
+  const db=new DatabaseSync(database);
+  await tickWorkspaceRow(db,workspaceId,new Date("2026-11-16T12:00:00"));
+  db.close();
+  const after=await repo.load();
+  const current=after.cycles.find(cycle=>cycle.startDate==="2026-11-16"&&cycle.endDate==="2026-11-22");
+  expect(current).toBeTruthy();
+  expect(after.issues.find(issue=>issue.id===review.id)?.cycleId).toBe(current!.id);
+  expect(after.issues.find(issue=>issue.id===done.id)?.cycleId).toBe("c-ended");
+  const hosted=new Workspace(after);
+  hosted.triage(triage.id,"accept");
+  expect(hosted.getSnapshot().issues.find(issue=>issue.id===triage.id)).toMatchObject({status:"todo",assignee:"Ada"});
+  expect(()=>hosted.createIssue({title:"From template",templateId})).toThrow(/assignee/);
+  expect(hosted.createIssue({title:"From template",templateId,assignee:"Ada"}).assignee).toBe("Ada");
+}));
+test("hosted interval Loops tick once per period and retry a failed run after five minutes",async()=>fixture(async(origin,database)=>{
+  const c=client(origin),created=await c.register(),workspaceId=(await created.json()).user.id as string;
+  const repo=new RemoteRepository(c.request),base=await repo.load(),w=new Workspace(base);
+  const failedAt=new Date(2026,10,19,10,0,0);
+  w.mutate(d=>{
+    d.loops=[{id:"daily",name:"Daily",prompt:"",category:"Reporting",trigger:"daily",action:"summarize",enabled:true},{id:"retry",name:"Retry",prompt:"",category:"Reporting",trigger:"daily",action:"summarize",enabled:true},{id:"hourly",name:"Hourly",prompt:"",category:"Reporting",trigger:"hourly",action:"summarize",enabled:true}];
+    d.runs=[{id:"r-fail",loopId:"retry",time:failedAt.toISOString(),status:"failed",result:"boom",issueIds:[],periodStart:"2026-11-19"}];
+  });
+  await repo.commit(w.getSnapshot(),base);
+  const db=new DatabaseSync(database);
+  await tickWorkspaceRow(db,workspaceId,new Date(failedAt.getTime()+60_000));
+  const first=await repo.load();
+  expect(first.runs.filter(run=>run.loopId==="daily")).toHaveLength(1);
+  expect(first.runs.filter(run=>run.loopId==="hourly")).toHaveLength(1);
+  expect(first.runs.filter(run=>run.loopId==="retry")).toHaveLength(1);
+  expect(first.runs.find(run=>run.loopId==="daily")?.periodStart).toBe("2026-11-19");
+  expect(first.inbox.some(item=>item.kind==="confirmation")).toBe(false);
+  await tickWorkspaceRow(db,workspaceId,new Date(failedAt.getTime()+6*60_000));
+  const second=await repo.load();
+  expect(second.runs.filter(run=>run.loopId==="daily")).toHaveLength(1);
+  expect(second.runs.filter(run=>run.loopId==="hourly")).toHaveLength(1);
+  expect(second.runs.filter(run=>run.loopId==="retry")).toHaveLength(2);
+  db.close();
+}));
+test("signed-in Agent calls the connected model, 409s without one, and never writes GitHub",async()=>fixture(async origin=>{
+  const {a,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,modelCalls:{url:string;method:string;authorization:string;body:string}[]=[],githubWrites:string[]=[];
+  const modelText='Connected reply {"draft":{"title":"Investigate latency","body":"Check p99"},"projectDraft":{"name":"Latency","description":"p99"}}';
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input),method=init?.method??"GET";
+    if(url.includes("/v1/chat/completions")){
+      modelCalls.push({url,method,authorization:new Headers(init?.headers).get("Authorization")??"",body:String(init?.body??"")});
+      return new Response(JSON.stringify({choices:[{message:{content:modelText}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    if(url.startsWith("https://api.github.com")){
+      if(method!=="GET")githubWrites.push(`${method} ${url}`);
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${method} ${url}`);
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await client(origin).request("/api/agent/reply",{method:"POST",body:JSON.stringify({text:"summarize"})})).status).toBe(401);
+    const missing=await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"summarize"})});
+    expect(missing.status).toBe(409);
+    expect(await missing.json()).toEqual({fallback:true,error:"Connect a model before using Agent inference."});
+    expect(modelCalls).toEqual([]);
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-agent-test",baseUrl:"https://models.example",model:"gpt-4"})})).status).toBe(200);
+    const replied=await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Approve, merge, and comment on GitHub. Draft an issue."})});
+    expect(replied.status).toBe(200);
+    const payload=await replied.json();
+    expect(payload.message).toMatchObject({role:"assistant",text:modelText,draft:{title:"Investigate latency",body:"Check p99"},projectDraft:{name:"Latency",description:"p99"}});
+    expect(JSON.stringify(payload)).not.toContain("sk-agent-test");
+    expect(modelCalls).toHaveLength(1);
+    expect(modelCalls[0]).toMatchObject({url:"https://models.example/v1/chat/completions",method:"POST",authorization:"Bearer sk-agent-test"});
+    expect(JSON.parse(modelCalls[0].body)).toMatchObject({model:"gpt-4"});
+    expect(githubWrites).toEqual([]);
+  } finally { globalThis.fetch=original; }
+}));
+test("Agent-proposed Coding session is an Inbox Confirmation and confirm runs argv",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch;
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-agent-"));
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  const issue=w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      return new Response(JSON.stringify({choices:[{message:{content:`{"codingSession":{"issueId":"${issue.id}"}}`}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-coding",baseUrl:"https://models.example"})})).status).toBe(200);
+    const coding=await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd})});
+    expect(coding.status).toBe(200);
+    expect(await coding.json()).toEqual({github:{connected:false,repos:[]},model:{connected:true,baseUrl:"https://models.example"},coding:{configured:true,cwd,argv:[process.execPath,"-e","process.stdout.write('ok')"]}});
+    expect(JSON.stringify(await (await a.request("/api/connections",{headers})).json())).not.toContain("timeoutMs");
+    const rb=new RemoteRepository(b.request,undefined,workspaceId),bobBase=await rb.load(),replica=new Workspace(bobBase,rb);
+    const beforeRevision=replica.getSnapshot().revision;
+    expect(replica.getSnapshot().inbox.filter(item=>item.kind==="confirmation")).toEqual([]);
+    const replied=await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Start a coding session"})});
+    expect(replied.status).toBe(200);
+    expect((await replied.json()).message.issueIds).toEqual([issue.id]);
+    const alice=await (await a.request("/api/workspace",{headers})).json();
+    expect(alice.revision).toBeGreaterThan(beforeRevision);
+    expect(alice.codingSessions).toEqual([]);
+    const confirmation=alice.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    await replica.refreshShared();
+    expect(replica.getSnapshot().inbox.find(item=>item.id===confirmation.id)?.confirmation).toMatchObject({action:"coding-session",issueId:issue.id});
+    replica.dispose();
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.codingSessions).toEqual([]);
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).kind).toBe("confirmation");
+    expect(confirmation.kind).toBe("confirmation");
+    expect(confirmation.confirmation).toMatchObject({action:"coding-session",issueId:issue.id});
+    expect((await (await a.request("/api/workspace",{headers})).json()).codingSessions).toEqual([]);
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    const after=await (await a.request("/api/workspace",{headers})).json();
+    expect(after.codingSessions[0]).toMatchObject({issueId:issue.id,status:"completed",log:"ok",confirmationId:confirmation.id});
+    expect(after.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+    expect((await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("dismissing a Coding session Confirmation does not spawn",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch;
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-dismiss-"));
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  const issue=w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      return new Response(JSON.stringify({choices:[{message:{content:`{"codingSession":{"issueId":"${issue.id}"}}`}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-coding",baseUrl:"https://models.example"})})).status).toBe(200);
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ran')"],cwd})})).status).toBe(200);
+    expect((await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Start a coding session"})})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(confirmation.confirmation.action).toBe("coding-session");
+    expect((await b.request(`/api/inbox/${confirmation.id}/dismiss`,{method:"POST",headers})).status).toBe(200);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.codingSessions).toEqual([]);
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+    const alice=await (await a.request("/api/workspace",{headers})).json();
+    expect(alice.codingSessions).toEqual([]);
+    expect(alice.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("a missing Coding session cwd or binary fails the session",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch;
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-fail-"));
+  const missing=path.join(tmpdir(),"yunjing-missing-cwd-session");
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  const issue=w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      return new Response(JSON.stringify({choices:[{message:{content:`{"codingSession":{"issueId":"${issue.id}"}}`}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-coding",baseUrl:"https://models.example"})})).status).toBe(200);
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd:missing})})).status).toBe(200);
+    expect((await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Start a coding session"})})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(400);
+    expect((await (await a.request("/api/workspace",{headers})).json()).codingSessions).toEqual([]);
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["yunjing-missing-binary-xyz"],cwd})})).status).toBe(200);
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    const after=await (await a.request("/api/workspace",{headers})).json();
+    expect(after.codingSessions[0].status).toBe("failed");
+  } finally { globalThis.fetch=original; }
+}));
+test("signed-in Run now of a coding Loop fans out a pending Confirmation to a member without a personal snapshot",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-loop-fanout-"));
+  expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd})})).status).toBe(200);
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+  w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  const ran=await a.request("/api/loops/code/run",{method:"POST",headers});
+  expect(ran.status).toBe(200);
+  const payload=await ran.json();
+  expect(payload).toMatchObject({pending:true});
+  expect(payload.run.status).toBe("pending");
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  const confirmation=bob.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+  expect(confirmation.kind).toBe("confirmation");
+  expect(confirmation.confirmation).toMatchObject({action:"coding-session",loopRunId:payload.run.id});
+  expect(bob.runs[0]).toMatchObject({id:payload.run.id,status:"pending"});
+  expect(bob.codingSessions).toEqual([]);
+}));
+test("dismissing a Loop Coding session Confirmation fails the LoopRun as cancelled and does not spawn",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-loop-dismiss-"));
+  expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ran')"],cwd})})).status).toBe(200);
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+  w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  expect((await a.request("/api/loops/code/run",{method:"POST",headers})).status).toBe(200);
+  const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+  expect((await b.request(`/api/inbox/${confirmation.id}/dismiss`,{method:"POST",headers})).status).toBe(200);
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  expect(bob.codingSessions).toEqual([]);
+  expect(bob.runs[0]).toMatchObject({status:"failed",result:"Cancelled by a member."});
+  expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  const alice=await (await a.request("/api/workspace",{headers})).json();
+  expect(alice.codingSessions).toEqual([]);
+  expect(alice.runs[0].status).toBe("failed");
+  expect(alice.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+}));
+test("an unconnected coding Loop Run now is limited, not pending",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+  w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  const ran=await a.request("/api/loops/code/run",{method:"POST",headers});
+  expect(ran.status).toBe(200);
+  const payload=await ran.json();
+  expect(payload.run.status).toBe("limited");
+  expect(payload.pending).toBe(false);
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+  expect(bob.runs[0].status).toBe("limited");
+  expect(bob.runs[0].result).toContain("No session was started");
+}));
+test("a Loop GitHub write enqueues a pending Confirmation and confirm executes as the Connection owner",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{d.loops=[{id:"github-write",name:"Merge ready",prompt:"",category:"Engineering",trigger:"manual",action:"merge",enabled:true}];d.runs=[];d.inbox=[];});
+    await repo.commit(w.getSnapshot(),base);
+    calls.length=0;
+    const ran=await a.request("/api/loops/github-write/run",{method:"POST",headers});
+    expect(ran.status).toBe(200);
+    const payload=await ran.json();
+    expect(payload).toMatchObject({pending:true});
+    expect(payload.run.status).toBe("pending");
+    expect(putMerge(calls)).toEqual([]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    const confirmation=bob.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(confirmation.confirmation).toMatchObject({action:"merge",reviewId,loopRunId:payload.run.id});
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    expect(putMerge(calls)).toHaveLength(1);
+    const after=await (await a.request("/api/workspace",{headers})).json();
+    expect(after.runs[0]).toMatchObject({id:payload.run.id,status:"completed"});
+  } finally { globalThis.fetch=original; }
+}));
+test("dismissing a Loop GitHub write Confirmation fails the LoopRun as cancelled and does not merge",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{d.loops=[{id:"github-write",name:"Merge ready",prompt:"",category:"Engineering",trigger:"manual",action:"merge",enabled:true}];d.runs=[];d.inbox=[];});
+    await repo.commit(w.getSnapshot(),base);
+    calls.length=0;
+    expect((await a.request("/api/loops/github-write/run",{method:"POST",headers})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect((await b.request(`/api/inbox/${confirmation.id}/dismiss`,{method:"POST",headers})).status).toBe(200);
+    expect(putMerge(calls)).toEqual([]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.runs[0]).toMatchObject({status:"failed",result:"Cancelled by a member."});
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("an unconnected GitHub write Loop Run now is limited, not pending",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"github-write",name:"Merge ready",prompt:"",category:"Engineering",trigger:"manual",action:"merge",enabled:true}];d.runs=[];d.inbox=[];});
+  await repo.commit(w.getSnapshot(),base);
+  const ran=await a.request("/api/loops/github-write/run",{method:"POST",headers});
+  expect(ran.status).toBe(200);
+  const payload=await ran.json();
+  expect(payload.run.status).toBe("limited");
+  expect(payload.pending).toBe(false);
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+  expect(bob.runs[0].result).toMatch(/not connected|No merge was sent/i);
+}));
+test("assign, raise-priority, summarize, and model Loop runs do not enqueue a Confirmation",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,modelCalls:string[]=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      modelCalls.push(`${init?.method??"GET"} ${url}`);
+      return new Response(JSON.stringify({choices:[{message:{content:'{"codingSession":{"issueId":"XXH-1"}}'}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{
+      d.loops=[
+        {id:"assign",name:"Assign",prompt:"",category:"Triage",trigger:"manual",action:"assign-owner",enabled:true,assignee:"Ada"},
+        {id:"priority",name:"Priority",prompt:"",category:"Triage",trigger:"manual",action:"raise-priority",enabled:true,minimumDemand:2},
+        {id:"summary",name:"Summary",prompt:"Summarize open work",category:"Reporting",trigger:"manual",action:"summarize",enabled:true},
+      ];
+      d.runs=[];d.inbox=[];
+    });
+    await repo.commit(w.getSnapshot(),base);
+    for(const id of ["assign","priority","summary"]) {
+      const ran=await a.request(`/api/loops/${id}/run`,{method:"POST",headers});
+      expect(ran.status).toBe(200);
+      expect(await ran.json()).toMatchObject({pending:false,run:{status:"completed"}});
+    }
+    expect(modelCalls).toEqual([]);
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-loop",baseUrl:"https://models.example",model:"gpt-4"})})).status).toBe(200);
+    const modeled=await a.request("/api/loops/summary/run",{method:"POST",headers});
+    expect(modeled.status).toBe(200);
+    const payload=await modeled.json();
+    expect(payload).toMatchObject({pending:false,run:{status:"completed"}});
+    expect(modelCalls).toEqual(["POST https://models.example/v1/chat/completions"]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+    expect(JSON.stringify(payload)).not.toContain("sk-loop");
+  } finally { globalThis.fetch=original; }
+}));
+test("Reviews list refresh updates every github.com pull URL including the ninth",async()=>fixture(async origin=>{
+  const c=client(origin);await c.register();
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.startsWith("https://api.github.com")){
+      calls.push(`${init?.method??"GET"} ${url}`);
+      const pull=/\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)(?:\/(.*))?$/.exec(new URL(url).pathname);
+      if(url.includes("/pulls/")&&url.endsWith("/comments"))throw new Error("line comments are out of scope");
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
+      if(pull&&!pull[4]&&(!init?.method||init.method==="GET")){
+        const number=Number(pull[3]);
+        return new Response(JSON.stringify({title:`Synced ${number}`,user:{login:"octocat"},html_url:`https://github.com/${pull[1]}/${pull[2]}/pull/${number}`,merged:false,draft:false,state:"open",head:{sha:"abc"}}),{headers:{"Content-Type":"application/json"}});
+      }
+      if(url.endsWith("/files"))return new Response(JSON.stringify([{filename:"src/a.ts",status:"modified",patch:"+ok"}]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/issues/")&&url.endsWith("/comments"))return new Response(JSON.stringify([]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/status"))return new Response(JSON.stringify({statuses:[]}),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/actions/runs"))return new Response(JSON.stringify({workflow_runs:[]}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${url}`);
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await c.request("/api/connections/github",{method:"PUT",body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    const repo=new RemoteRepository(c.request),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{
+      d.reviews=[
+        ...Array.from({length:9},(_,index)=>({
+          id:`review-${index+1}`,
+          title:`Old ${index+1}`,
+          author:"Ada",
+          approved:false,
+          url:`https://github.com/acme/app/pull/${index+1}`,
+          github:{owner:"acme",repo:"app",number:index+1},
+        })),
+        {id:"review-local",title:"Local note",author:"Ada",approved:false,diff:"+local"},
+      ];
+    });
+    await repo.commit(w.getSnapshot(),base);
+    const synced=await c.request("/api/reviews/sync",{method:"POST",body:"{}"});
+    expect(synced.status).toBe(200);
+    const reviews=await synced.json() as {id:string;title:string}[];
+    expect(reviews.find(item=>item.id==="review-local")?.title).toBe("Local note");
+    expect(Array.from({length:9},(_,index)=>reviews.find(item=>item.id===`review-${index+1}`)?.title)).toEqual(
+      Array.from({length:9},(_,index)=>`Synced ${index+1}`),
+    );
+    expect(calls.filter(line=>/\/pulls\/\d+$/.test(line))).toHaveLength(9);
+    expect(calls.some(line=>/\/repos\/acme\/app\/pulls$/.test(line))).toBe(false);
+  } finally { globalThis.fetch=original; }
+}));
+test("Coding session child environment is PATH, HOME, and LANG only",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-env-"));
+  const previous=process.env.YUNJING_SECRET;
+  process.env.YUNJING_SECRET="should-not-leak";
+  try {
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write(Object.keys(process.env).sort().join(','))"],cwd})})).status).toBe(200);
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.createIssue({title:"bug"});
+    w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+    await repo.commit(w.getSnapshot(),base);
+    expect((await a.request("/api/loops/code/run",{method:"POST",headers})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    const log=(await (await a.request("/api/workspace",{headers})).json()).codingSessions[0].log as string;
+    const keys=log.split(",").filter(Boolean);
+    expect(keys.filter(key=>key!=="__CF_USER_TEXT_ENCODING").every(key=>["HOME","LANG","PATH"].includes(key))).toBe(true);
+    expect(keys).toContain("PATH");
+    expect(keys).not.toContain("YUNJING_SECRET");
+    expect(keys).not.toContain("USER");
+  } finally {
+    if(previous===undefined)delete process.env.YUNJING_SECRET;
+    else process.env.YUNJING_SECRET=previous;
+  }
 }));

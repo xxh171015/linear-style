@@ -309,6 +309,46 @@ describe("local adapters and automations", () => {
     expect(run.status).toBe("limited");
     expect(run.result).toContain("No message was sent");
   });
+  test("unconnected IndexedDB mode sends no outbound GitHub, model, or coding calls", async () => {
+    const original = globalThis.fetch;
+    const outbound: string[] = [];
+    globalThis.fetch = async (input, init) => {
+      outbound.push(String(input));
+      return original(input, init);
+    };
+    try {
+      const w = fresh();
+      w.mutate((d) => {
+        d.reviews = [
+          {
+            id: "review",
+            title: "Test",
+            author: "Ada",
+            approved: false,
+            status: "review",
+          },
+        ];
+        d.loops.push({
+          id: "code",
+          name: "Autofix",
+          prompt: "",
+          category: "Engineering",
+          trigger: "manual",
+          action: "coding-session",
+          enabled: true,
+        });
+      });
+      w.createIssue({ title: "offline coding" });
+      w.transitionReview("review", "approve");
+      const run = w.runLoop("code");
+      expect(run.status).toBe("limited");
+      expect(run.result).toContain("No session was started");
+      await localAgent.reply("Draft issue: stay local", w.getSnapshot());
+      expect(outbound).toEqual([]);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
   test("scheduled loops run once per interval while the app is active", () => {
     const w = fresh();
     w.mutate((d) =>
@@ -713,4 +753,400 @@ test("invalid template saves cannot poison the workspace and editing never reviv
   expect(()=>w.saveIssueTemplate("Changed",fields,id)).toThrow("Restore");expect(w.getSnapshot()).toBe(deleted);
   w.setTemplateDeleted(id,false);w.saveIssueTemplate("Changed",fields,id);
   expect(migrateData(w.getSnapshot()).templates[0].name).toBe("Changed");
+});
+
+test("team triage destinations and Accept rotation replace the hardcoded Backlog/Canceled path", () => {
+  const w = fresh();
+  w.updateTeam("XXH", { triageAcceptStatus: "todo", triageDeclineStatus: "duplicate", triageRotation: ["Ada", "Bea"] });
+  const first = w.createIssue({ title: "one", status: "triage" });
+  w.triage(first.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === first.id)).toMatchObject({ status: "todo", assignee: "Ada" });
+  const second = w.createIssue({ title: "two", status: "triage" });
+  w.triage(second.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === second.id)?.assignee).toBe("Bea");
+  const third = w.createIssue({ title: "three", status: "triage" });
+  w.triage(third.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === third.id)?.assignee).toBe("Ada");
+  const fourth = w.createIssue({ title: "four", status: "triage" });
+  w.triage(fourth.id, "decline");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === fourth.id)?.status).toBe("duplicate");
+});
+
+test("required template fields block create until filled, then stamp the draft template", () => {
+  const w = fresh();
+  const projectId = w.getSnapshot().projects[0].id;
+  const id = w.saveIssueTemplate("Need project", { ...w.getSnapshot().draft, title: "From template" }, undefined, {
+    required: ["project", "priority"],
+  });
+  w.applyIssueTemplate(id);
+  expect(w.getSnapshot().draft.templateId).toBe(id);
+  const before = w.getSnapshot();
+  expect(() => w.createIssue(w.getSnapshot().draft)).toThrow(/project/);
+  expect(w.getSnapshot()).toBe(before);
+  w.mutate((d) => {
+    d.draft.projectId = projectId;
+    d.draft.priority = 2;
+  });
+  expect(w.createIssue(w.getSnapshot().draft).projectId).toBe(projectId);
+});
+
+test("a configured coding Loop enqueues a Confirmation instead of pretending to start", () => {
+  const w = new Workspace(initialData(), undefined, {
+    reviews: { transition: (review) => review },
+    automations: {
+      external: () => ({ status: "limited", message: "unused" }),
+      codingConfigured: () => true,
+      startCodingSession: (issueId) => ({ status: "completed", message: `started ${issueId}`, log: "ok" }),
+    },
+  });
+  w.mutate((d) => {
+    d.issues = [];
+    d.inbox = [];
+    d.loops = [{
+      id: "code",
+      name: "Autofix",
+      prompt: "",
+      category: "Engineering",
+      trigger: "triage",
+      action: "coding-session",
+      enabled: true,
+    }];
+    d.runs = [];
+  });
+  const issue = w.createIssue({ title: "bug", status: "triage" });
+  const run = w.getSnapshot().runs[0];
+  expect(run.status).toBe("pending");
+  const confirmation = w.getSnapshot().inbox.find((item) => item.kind === "confirmation");
+  expect(confirmation?.confirmation).toMatchObject({ action: "coding-session", issueId: issue.id, loopRunId: run.id });
+  w.dismissConfirmation(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("failed");
+  w.mutate((d) => {
+    d.runs[0].status = "pending";
+    delete d.inbox.find((item) => item.id === confirmation!.id)!.archivedAt;
+  });
+  w.confirmInbox(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("completed");
+  expect(w.getSnapshot().codingSessions[0].log).toBe("ok");
+});
+
+test("an unconnected GitHub write Loop is limited, not pending", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.reviews = [
+      {
+        id: "review",
+        title: "Fix",
+        author: "Ada",
+        approved: false,
+        github: { owner: "acme", repo: "app", number: 41 },
+      },
+    ];
+    d.loops.push({
+      id: "merge",
+      name: "Merge ready",
+      prompt: "",
+      category: "Engineering",
+      trigger: "manual",
+      action: "merge",
+      enabled: true,
+    });
+  });
+  const run = w.runLoop("merge");
+  expect(run.status).toBe("limited");
+  expect(w.getSnapshot().inbox.filter((item) => item.kind === "confirmation")).toHaveLength(0);
+});
+
+test("a configured GitHub write Loop enqueues a pending Confirmation instead of merging", () => {
+  const w = new Workspace(initialData(), undefined, {
+    reviews: {
+      transition: (review, action) =>
+        action === "merge" ? { ...review, status: "merged", approved: true } : review,
+    },
+    automations: {
+      external: () => ({ status: "limited", message: "unused" }),
+      githubConfigured: () => true,
+    },
+  });
+  w.mutate((d) => {
+    d.inbox = [];
+    d.reviews = [
+      {
+        id: "review",
+        title: "Fix",
+        author: "Ada",
+        approved: false,
+        status: "review",
+        github: { owner: "acme", repo: "app", number: 41 },
+      },
+    ];
+    d.loops = [
+      {
+        id: "merge",
+        name: "Merge ready",
+        prompt: "",
+        category: "Engineering",
+        trigger: "manual",
+        action: "merge",
+        enabled: true,
+      },
+    ];
+    d.runs = [];
+  });
+  const run = w.runLoop("merge");
+  expect(run.status).toBe("pending");
+  const confirmation = w.getSnapshot().inbox.find((item) => item.kind === "confirmation");
+  expect(confirmation?.confirmation).toMatchObject({
+    action: "merge",
+    reviewId: "review",
+    loopRunId: run.id,
+  });
+  expect(w.getSnapshot().reviews[0].status).not.toBe("merged");
+  w.dismissConfirmation(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("failed");
+  w.mutate((d) => {
+    d.runs[0].status = "pending";
+    delete d.inbox.find((item) => item.id === confirmation!.id)!.archivedAt;
+  });
+  w.confirmInbox(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("completed");
+  expect(w.getSnapshot().reviews[0].status).toBe("merged");
+});
+
+test("tick rolls a completed cycle and does not double-run a daily Loop", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.cycles = [{
+      id: "c-ended",
+      number: 1,
+      name: "Cycle 1",
+      startDate: "2026-11-09",
+      endDate: "2026-11-15",
+      capacity: 8,
+      description: "",
+      teamKey: "XXH",
+    }];
+    d.loops.push({
+      id: "daily",
+      name: "Daily",
+      prompt: "",
+      category: "Reporting",
+      trigger: "daily",
+      action: "summarize",
+      enabled: true,
+    });
+  });
+  const issue = w.createIssue({ title: "carry", cycleId: "c-ended", status: "review" });
+  w.tick(new Date("2026-11-16T12:00:00"));
+  expect(w.getSnapshot().issues.find((item) => item.id === issue.id)?.cycleId).not.toBe("c-ended");
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  w.tick(new Date("2026-11-16T18:00:00"));
+  expect(w.getSnapshot().runs).toHaveLength(1);
+});
+
+test("Team Cycle duration is 1–366 days and tick auto-creates adjacent Cycles until one covers today", () => {
+  const w = fresh();
+  expect(() => w.updateTeam("XXH", { cycleDurationDays: 0 })).toThrow(/1–366/);
+  expect(() => w.updateTeam("XXH", { cycleDurationDays: 367 })).toThrow(/1–366/);
+  expect(() => w.updateTeam("XXH", { cycleDurationDays: 1.5 })).toThrow(/1–366/);
+  w.updateTeam("XXH", { cycleDurationDays: 1 });
+  w.updateTeam("XXH", { cycleDurationDays: 366 });
+  expect(w.getSnapshot().teams[0].cycleDurationDays).toBe(366);
+  w.mutate((d) => {
+    d.teams[0].cycleDurationDays = undefined;
+    d.cycles = [{
+      id: "c-ended",
+      number: 1,
+      name: "Cycle 1",
+      startDate: "2026-11-02",
+      endDate: "2026-11-08",
+      capacity: 8,
+      description: "",
+      teamKey: "XXH",
+    }];
+  });
+  w.tick(new Date("2026-11-19T12:00:00"));
+  expect(
+    w.getSnapshot().cycles.map((cycle) => [cycle.startDate, cycle.endDate]).sort(),
+  ).toEqual([
+    ["2026-11-02", "2026-11-08"],
+    ["2026-11-09", "2026-11-15"],
+    ["2026-11-16", "2026-11-22"],
+  ]);
+  w.updateTeam("XXH", { cycleDurationDays: 14 });
+  w.mutate((d) => {
+    d.cycles = [{
+      id: "c-long",
+      number: 1,
+      name: "Cycle 1",
+      startDate: "2026-10-19",
+      endDate: "2026-11-01",
+      capacity: 8,
+      description: "",
+      teamKey: "XXH",
+    }];
+  });
+  w.tick(new Date("2026-11-16T12:00:00"));
+  expect(
+    w.getSnapshot().cycles.map((cycle) => [cycle.startDate, cycle.endDate]).sort(),
+  ).toEqual([
+    ["2026-10-19", "2026-11-01"],
+    ["2026-11-02", "2026-11-15"],
+    ["2026-11-16", "2026-11-29"],
+  ]);
+});
+
+test("tick moves incomplete Issues including In Review onto the immediate successor, oldest completed Cycle first", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.cycles = [
+      { id: "c1", number: 1, name: "Cycle 1", startDate: "2026-11-02", endDate: "2026-11-08", capacity: 8, description: "", teamKey: "XXH" },
+      { id: "c2", number: 2, name: "Cycle 2", startDate: "2026-11-09", endDate: "2026-11-15", capacity: 8, description: "", teamKey: "XXH" },
+    ];
+  });
+  const review = w.createIssue({ title: "review", cycleId: "c1", status: "review" });
+  const todo = w.createIssue({ title: "todo", cycleId: "c2", status: "todo" });
+  const done = w.createIssue({ title: "done", cycleId: "c1", status: "done" });
+  const canceled = w.createIssue({ title: "canceled", cycleId: "c2", status: "canceled" });
+  const duplicate = w.createIssue({ title: "duplicate", cycleId: "c1", status: "duplicate" });
+  w.tick(new Date("2026-11-16T12:00:00"));
+  const current = w.getSnapshot().cycles.find((cycle) => cycle.startDate === "2026-11-16" && cycle.endDate === "2026-11-22");
+  expect(current).toBeTruthy();
+  const issues = w.getSnapshot().issues;
+  expect(issues.find((issue) => issue.id === review.id)?.cycleId).toBe(current!.id);
+  expect(issues.find((issue) => issue.id === todo.id)?.cycleId).toBe(current!.id);
+  expect(issues.find((issue) => issue.id === done.id)?.cycleId).toBe("c1");
+  expect(issues.find((issue) => issue.id === canceled.id)?.cycleId).toBe("c2");
+  expect(issues.find((issue) => issue.id === duplicate.id)?.cycleId).toBe("c1");
+});
+
+test("Accept with an empty rotation still writes the destination status", () => {
+  const w = fresh();
+  w.updateTeam("XXH", { triageAcceptStatus: "progress", triageRotation: [] });
+  const issue = w.createIssue({ title: "keep owner", status: "triage", assignee: "Keep" });
+  w.triage(issue.id, "accept");
+  expect(w.getSnapshot().issues.find((item) => item.id === issue.id)).toMatchObject({
+    status: "progress",
+    assignee: "Keep",
+  });
+});
+
+test("saving the Accept rotation list resets the rotation index", () => {
+  const w = fresh();
+  w.updateTeam("XXH", { triageRotation: ["Ada", "Bea"] });
+  const first = w.createIssue({ title: "one", status: "triage" });
+  w.triage(first.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === first.id)?.assignee).toBe("Ada");
+  w.updateTeam("XXH", { triageRotation: ["Ada", "Bea"] });
+  const second = w.createIssue({ title: "two", status: "triage" });
+  w.triage(second.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === second.id)?.assignee).toBe("Ada");
+});
+
+test("a Template belongs to one Team or all Teams and apply only uses Templates for the current Team", () => {
+  const w = fresh();
+  const fields = { ...w.getSnapshot().draft, title: "From template" };
+  w.createTeam({ key: "ENG", name: "Engineering" });
+  const eng = w.saveIssueTemplate("Eng only", fields, undefined, { teamKey: "ENG" });
+  w.setCurrentTeam("XXH");
+  const xxh = w.saveIssueTemplate("Xxh only", fields, undefined, { teamKey: "XXH" });
+  const all = w.saveIssueTemplate("All teams", fields);
+  expect(w.getSnapshot().templates.find((template) => template.id === eng)?.teamKey).toBe("ENG");
+  expect(w.getSnapshot().templates.find((template) => template.id === xxh)?.teamKey).toBe("XXH");
+  expect(w.getSnapshot().templates.find((template) => template.id === all)?.teamKey).toBeUndefined();
+  w.setCurrentTeam("ENG");
+  w.applyIssueTemplate(eng);
+  expect(w.getSnapshot().draft.templateId).toBe(eng);
+  w.applyIssueTemplate(all);
+  expect(w.getSnapshot().draft.templateId).toBe(all);
+  const before = w.getSnapshot();
+  expect(() => w.applyIssueTemplate(xxh)).toThrow(/current Team/);
+  expect(w.getSnapshot()).toBe(before);
+});
+
+test("required assignee and status block create until filled", () => {
+  const w = fresh();
+  const assigneeId = w.saveIssueTemplate("Need assignee", { ...w.getSnapshot().draft, title: "Assigned" }, undefined, {
+    required: ["assignee"],
+  });
+  const beforeAssignee = w.getSnapshot();
+  expect(() => w.createIssue({ title: "Assigned", templateId: assigneeId })).toThrow(/assignee/);
+  expect(w.getSnapshot()).toBe(beforeAssignee);
+  expect(w.createIssue({ title: "Assigned", templateId: assigneeId, assignee: "Ada" }).assignee).toBe("Ada");
+  const statusId = w.saveIssueTemplate("Need status", { ...w.getSnapshot().draft, title: "Stateful" }, undefined, {
+    required: ["status"],
+  });
+  const beforeStatus = w.getSnapshot();
+  expect(() => w.createIssue({ title: "Stateful", templateId: statusId })).toThrow(/status/);
+  expect(w.getSnapshot()).toBe(beforeStatus);
+  expect(w.createIssue({ title: "Stateful", templateId: statusId, status: "todo" }).status).toBe("todo");
+});
+
+test("a failed interval run retries after five minutes", () => {
+  const w = fresh();
+  const failedAt = new Date(2026, 10, 19, 10, 0, 0);
+  w.mutate((d) => {
+    d.loops.push({
+      id: "daily",
+      name: "Daily",
+      prompt: "",
+      category: "Reporting",
+      trigger: "daily",
+      action: "summarize",
+      enabled: true,
+    });
+    d.runs.push({
+      id: "r-fail",
+      loopId: "daily",
+      time: failedAt.toISOString(),
+      status: "failed",
+      result: "boom",
+      issueIds: [],
+      periodStart: "2026-11-19",
+    });
+  });
+  w.tick(new Date(failedAt.getTime() + 60_000));
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  w.tick(new Date(failedAt.getTime() + 6 * 60_000));
+  expect(w.getSnapshot().runs).toHaveLength(2);
+  expect(w.getSnapshot().runs[0].periodStart).toBe("2026-11-19");
+});
+
+test("event-triggered Loops do not re-run the same Issue activity", () => {
+  const w = fresh();
+  w.mutate((d) =>
+    d.loops.push({
+      id: "watch",
+      name: "Watch",
+      prompt: "",
+      category: "Triage",
+      trigger: "issue-updated",
+      action: "summarize",
+      enabled: true,
+    }),
+  );
+  const issue = w.createIssue({ title: "live", status: "todo" });
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  expect(w.getSnapshot().runs[0]).toMatchObject({ loopId: "watch", triggerIssueId: issue.id });
+  const activityId = w.getSnapshot().runs[0].triggerActivityId;
+  expect(activityId).toBeTruthy();
+  w.updateIssue(issue.id, { priority: 2 });
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  w.updateIssue(issue.id, { title: "renamed" }, "renamed");
+  expect(w.getSnapshot().runs).toHaveLength(2);
+  expect(w.getSnapshot().runs[0].triggerActivityId).not.toBe(activityId);
+});
+
+test("assign, raise-priority, and summarize Loops run without a Confirmation", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.loops.push(
+      { id: "assign", name: "Assign", prompt: "", category: "Triage", trigger: "manual", action: "assign-owner", enabled: false, assignee: "Ada" },
+      { id: "priority", name: "Priority", prompt: "", category: "Triage", trigger: "manual", action: "raise-priority", enabled: false, minimumDemand: 2 },
+      { id: "summary", name: "Summary", prompt: "", category: "Reporting", trigger: "manual", action: "summarize", enabled: false },
+    );
+  });
+  expect(w.runLoop("assign").status).toBe("completed");
+  expect(w.runLoop("priority").status).toBe("completed");
+  expect(w.runLoop("summary").status).toBe("completed");
+  expect(w.getSnapshot().inbox.filter((item) => item.kind === "confirmation")).toHaveLength(0);
 });

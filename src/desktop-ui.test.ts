@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, test, vi } from "vitest";
 import App from "./App";
+import { AccountContext } from "./account-ui";
 import { initialData, Workspace } from "./workspace";
 import type { DesktopCommand } from "./desktop";
 
@@ -143,4 +144,91 @@ test("workspace More stays open after choosing Documents, Archive or Settings",a
   expect(host.querySelector(".r-nav-more")?.hasAttribute("open")).toBe(true);
   expect(host.querySelector(".r-workspace-more")).not.toBeNull();
   await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+});
+
+test("offline settings, inbox Confirmation, reviews and cycles expose the connected-workspace controls",async()=>{
+  const e=environment(),workspace=new Workspace(initialData());
+  workspace.updateTeam("XXH",{cycleDurationDays:14,triageAcceptStatus:"todo",triageDeclineStatus:"duplicate"});
+  const reviewId=workspace.getSnapshot().reviews[0].id,issueId=workspace.getSnapshot().issues[0].id;
+  workspace.mutate(d=>{
+    d.inbox.unshift({id:"confirm-merge",issueId,kind:"confirmation",text:"Confirm merge of demo as the Workspace GitHub PAT owner.",time:new Date().toISOString(),read:false,confirmation:{action:"merge",reviewId}});
+  });
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);
+  await act(async()=>root.render(createElement(App,{workspace})));
+  await act(async()=>e.command({type:"settings"}));
+  expect(host.textContent).toContain("Cycle length (days)");
+  expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe("14");
+  expect(host.textContent).toContain("This device is offline");
+  expect(host.textContent).not.toContain("Fine-grained personal access token");
+  expect(host.textContent).not.toContain("Save GitHub");
+  expect(host.textContent).not.toContain("Save model");
+  expect(host.textContent).not.toContain("Save coding executor");
+  expect(host.querySelector('input[type="password"]')).toBeNull();
+  expect(host.textContent).toContain("Issue templates");
+  await act(async()=>e.command({type:"navigate",route:"#/inbox"}));
+  await act(async()=>host.querySelector<HTMLButtonElement>(".r-inbox-list button")!.click());
+  expect(host.textContent).toContain("Confirming authorizes the Workspace Connection");
+  expect(host.textContent).toContain("GitHub writes appear as the PAT owner");
+  await act(async()=>[...host.querySelectorAll("button")].find(button=>button.textContent==="Dismiss")!.click());
+  expect(workspace.getSnapshot().inbox.find(item=>item.id==="confirm-merge")?.archivedAt).toBeTruthy();
+  await act(async()=>e.command({type:"navigate",route:`#/reviews/${reviewId}`}));
+  expect(host.textContent).toContain("Local review");
+  expect(host.textContent).toContain("Mark merged locally");
+  await act(async()=>e.command({type:"navigate",route:"#/cycles"}));
+  expect(host.textContent).toContain("14-day cycles");
+  await act(async()=>e.command({type:"navigate",route:"#/agent"}));
+  expect(host.textContent).toContain("Local assistant");
+  await act(async()=>e.command({type:"navigate",route:"#/loops"}));
+  expect(host.textContent).toContain("Schedules run while this app is open");
+  await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+});
+
+test("a hosted renderer says schedules run on the account server",async()=>{
+  const e=environment();
+  const workspace=new Workspace(initialData(),{load:async()=>undefined,save:async()=>{},nextIssueIdentifier:()=>"XXH-1"});
+  const account={
+    user:{id:"user-1",email:"qa@example.test",name:"QA"},
+    membership:{id:"ws-1",name:"QA workspace",role:"admin" as const},
+    summary:{workspaces:[{id:"ws-1",name:"QA workspace",role:"admin" as const}],invitations:[]},
+    members:[],
+    refreshMembers:async()=>{},
+    switchWorkspace:async()=>{},
+    signOut:async()=>{},
+    reconnect:()=>{},
+  };
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);
+  try {
+    await act(async()=>root.render(createElement(AccountContext.Provider,{value:account},createElement(App,{workspace}))));
+    await act(async()=>e.command({type:"navigate",route:"#/loops"}));
+    expect(host.textContent).toContain("Schedules run on the account server");
+    expect(host.textContent).toContain("limited means the adapter is not connected");
+  } finally {
+    await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+  }
+});
+
+test("signed-out Agent drafts locally and does not send a model request",async()=>{
+  const e=environment(),workspace=new Workspace(initialData());
+  const original=globalThis.fetch,outbound:string[]=[];
+  globalThis.fetch=async(input)=>{outbound.push(String(input));return original(input);};
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);
+  try {
+    await act(async()=>root.render(createElement(App,{workspace})));
+    await act(async()=>e.command({type:"navigate",route:"#/agent"}));
+    expect(host.textContent).toContain("Local assistant");
+    const textarea=host.querySelector<HTMLTextAreaElement>('[aria-label="Send a message to Linear AI"]');
+    await act(async()=>{
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(textarea,"Draft issue: Investigate latency");
+      textarea!.dispatchEvent(new Event("input",{bubbles:true}));
+    });
+    await act(async()=>{
+      host.querySelector<HTMLFormElement>(".r-agent-compose form")!.requestSubmit();
+    });
+    expect(host.textContent).toContain("Investigate latency");
+    expect(host.textContent).toContain("Here is a local issue draft");
+    expect(outbound.some(url=>url.includes("/v1/chat/completions")||url.includes("/api/agent/reply"))).toBe(false);
+  } finally {
+    globalThis.fetch=original;
+    await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+  }
 });

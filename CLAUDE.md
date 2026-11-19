@@ -2,11 +2,11 @@
 
 ### Issue tracker
 
-Issues live in Linear team `XXH`. See `docs/agents/issue-tracker.md`.
+Issues live as markdown files under `.scratch/<feature>/`. See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 
-The five canonical triage roles map onto Linear labels and the Triage inbox. See `docs/agents/triage-labels.md`.
+The five canonical triage roles use their default label strings. See `docs/agents/triage-labels.md`.
 
 ### Domain docs
 
