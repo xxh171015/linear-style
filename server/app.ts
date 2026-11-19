@@ -31,7 +31,10 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
   const connections=connectionStore(db);
   const streams=new Map<string,Map<ServerResponse,string>>(),rates=new Map<string,{count:number;until:number}>();
   function notifyWorkspace(id:string){for(const [stream] of streams.get(id)??[])if(!stream.writableEnded&&!stream.destroyed)stream.write("data: changed\n\n");}
-  const jobHooks={codingConfigured:(workspaceId:string)=>Boolean(connections.row(workspaceId,"coding"))};
+  const jobHooks={
+    codingConfigured:(workspaceId:string)=>Boolean(connections.row(workspaceId,"coding")),
+    githubConfigured:(workspaceId:string)=>Boolean(connections.row(workspaceId,"github")),
+  };
   const stopJobs=startWorkspaceJobs(db,(workspaceId,confirmations)=>{spaces.fanOutInbox(workspaceId,confirmations);notifyWorkspace(workspaceId);},jobHooks);
   function limit(key:string,max:number) {
     const now=Date.now();for(const [key,value] of rates)if(value.until<now)rates.delete(key);
@@ -261,8 +264,23 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
         }
         const loopRun=/^\/api\/loops\/([^/]+)\/run$/.exec(route);
         if(loopRun&&method==="POST") {
-          const snapshot=await applySharedWorkspace(db,selected,workspace=>{
-            workspace.runLoop(decodeURIComponent(loopRun[1]));
+          const loopId=decodeURIComponent(loopRun[1]);
+          const snapshot=await applySharedWorkspace(db,selected,async workspace=>{
+            workspace.runLoop(loopId);
+            const loop=workspace.getSnapshot().loops.find(item=>item.id===loopId);
+            if(loop?.action==="summarize") {
+              const model=connections.row(selected,"model");
+              if(model) {
+                const config=JSON.parse(model.config) as ModelConfig;
+                const live=workspace.getSnapshot();
+                const digest=live.issues.filter(issue=>!issue.deletedAt).slice(0,40).map(issue=>`${issue.id} ${issue.status} ${issue.title}`).join("\n");
+                const message=await modelReply(config.baseUrl,model.secret,config.model,loop.prompt||"summarize",digest);
+                workspace.mutate(data=>{
+                  const run=data.runs[0];
+                  if(run)run.result=message.text;
+                });
+              }
+            }
           },jobHooks);
           const confirmations=snapshot.inbox.filter(item=>item.kind==="confirmation");
           spaces.fanOutInbox(selected,confirmations);

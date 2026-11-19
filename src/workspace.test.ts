@@ -826,6 +826,89 @@ test("a configured coding Loop enqueues a Confirmation instead of pretending to 
   expect(w.getSnapshot().codingSessions[0].log).toBe("ok");
 });
 
+test("an unconnected GitHub write Loop is limited, not pending", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.reviews = [
+      {
+        id: "review",
+        title: "Fix",
+        author: "Ada",
+        approved: false,
+        github: { owner: "acme", repo: "app", number: 41 },
+      },
+    ];
+    d.loops.push({
+      id: "merge",
+      name: "Merge ready",
+      prompt: "",
+      category: "Engineering",
+      trigger: "manual",
+      action: "merge",
+      enabled: true,
+    });
+  });
+  const run = w.runLoop("merge");
+  expect(run.status).toBe("limited");
+  expect(w.getSnapshot().inbox.filter((item) => item.kind === "confirmation")).toHaveLength(0);
+});
+
+test("a configured GitHub write Loop enqueues a pending Confirmation instead of merging", () => {
+  const w = new Workspace(initialData(), undefined, {
+    reviews: {
+      transition: (review, action) =>
+        action === "merge" ? { ...review, status: "merged", approved: true } : review,
+    },
+    automations: {
+      external: () => ({ status: "limited", message: "unused" }),
+      githubConfigured: () => true,
+    },
+  });
+  w.mutate((d) => {
+    d.inbox = [];
+    d.reviews = [
+      {
+        id: "review",
+        title: "Fix",
+        author: "Ada",
+        approved: false,
+        status: "review",
+        github: { owner: "acme", repo: "app", number: 41 },
+      },
+    ];
+    d.loops = [
+      {
+        id: "merge",
+        name: "Merge ready",
+        prompt: "",
+        category: "Engineering",
+        trigger: "manual",
+        action: "merge",
+        enabled: true,
+      },
+    ];
+    d.runs = [];
+  });
+  const run = w.runLoop("merge");
+  expect(run.status).toBe("pending");
+  const confirmation = w.getSnapshot().inbox.find((item) => item.kind === "confirmation");
+  expect(confirmation?.confirmation).toMatchObject({
+    action: "merge",
+    reviewId: "review",
+    loopRunId: run.id,
+  });
+  expect(w.getSnapshot().reviews[0].status).not.toBe("merged");
+  w.dismissConfirmation(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("failed");
+  w.mutate((d) => {
+    d.runs[0].status = "pending";
+    delete d.inbox.find((item) => item.id === confirmation!.id)!.archivedAt;
+  });
+  w.confirmInbox(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("completed");
+  expect(w.getSnapshot().reviews[0].status).toBe("merged");
+});
+
 test("tick rolls a completed cycle and does not double-run a daily Loop", () => {
   const w = fresh();
   w.mutate((d) => {

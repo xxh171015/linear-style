@@ -6,6 +6,7 @@ import { blankPersonal, HTTPError, hydrateShared, split } from "./workspaces";
 
 export type WorkspaceJobHooks = {
   codingConfigured?(workspaceId: string): boolean;
+  githubConfigured?(workspaceId: string): boolean;
 };
 
 function servicesFor(workspaceId: string, hooks?: WorkspaceJobHooks): ServiceAdapters {
@@ -14,6 +15,7 @@ function servicesFor(workspaceId: string, hooks?: WorkspaceJobHooks): ServiceAda
     automations: {
       ...offlineServices.automations,
       codingConfigured: () => Boolean(hooks?.codingConfigured?.(workspaceId)),
+      githubConfigured: () => Boolean(hooks?.githubConfigured?.(workspaceId)),
     },
   };
 }

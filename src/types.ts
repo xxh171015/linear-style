@@ -362,7 +362,8 @@ export type LoopAction =
   | "assign-owner"
   | "raise-priority"
   | "coding-session"
-  | "slack-reply";
+  | "slack-reply"
+  | "merge";
 export type Loop = {
   id: string;
   name: string;

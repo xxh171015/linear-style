@@ -1641,6 +1641,30 @@ export class Workspace {
           status = outcome.status;
           result = outcome.message;
         }
+      } else if (loop.action === "merge") {
+        if (!this.services.automations.githubConfigured?.()) {
+          status = "limited";
+          result = "GitHub writes require a connected GitHub service. No merge was sent.";
+        } else {
+          const review = d.reviews.find(
+            (item) => item.github && item.status !== "merged" && item.status !== "closed",
+          );
+          if (!review) result = "No connected Review in scope to merge.";
+          else {
+            status = "pending";
+            result = "Waiting for confirmation to merge.";
+            confirmationId = uid("inbox");
+            d.inbox.unshift({
+              id: confirmationId,
+              issueId: review.issueIds?.[0] ?? review.id,
+              kind: "confirmation",
+              text: `Confirm merge of ${review.title} as the Workspace GitHub PAT owner.`,
+              time: stamp(),
+              read: false,
+              confirmation: { action: "merge", reviewId: review.id, loopRunId: "" },
+            });
+          }
+        }
       } else result = summarizeIssues(issues, d);
       loop.lastRunAt = stamp();
       const period = ["hourly", "daily", "weekly"].includes(loop.trigger)

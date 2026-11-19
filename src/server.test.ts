@@ -621,3 +621,159 @@ test("a missing Coding session cwd or binary fails the session",async()=>fixture
     expect(after.codingSessions[0].status).toBe("failed");
   } finally { globalThis.fetch=original; }
 }));
+test("signed-in Run now of a coding Loop fans out a pending Confirmation to a member without a personal snapshot",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-loop-fanout-"));
+  expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd})})).status).toBe(200);
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+  w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  const ran=await a.request("/api/loops/code/run",{method:"POST",headers});
+  expect(ran.status).toBe(200);
+  const payload=await ran.json();
+  expect(payload).toMatchObject({pending:true});
+  expect(payload.run.status).toBe("pending");
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  const confirmation=bob.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+  expect(confirmation.kind).toBe("confirmation");
+  expect(confirmation.confirmation).toMatchObject({action:"coding-session",loopRunId:payload.run.id});
+  expect(bob.runs[0]).toMatchObject({id:payload.run.id,status:"pending"});
+  expect(bob.codingSessions).toEqual([]);
+}));
+test("dismissing a Loop Coding session Confirmation fails the LoopRun as cancelled and does not spawn",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-loop-dismiss-"));
+  expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ran')"],cwd})})).status).toBe(200);
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+  w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  expect((await a.request("/api/loops/code/run",{method:"POST",headers})).status).toBe(200);
+  const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+  expect((await b.request(`/api/inbox/${confirmation.id}/dismiss`,{method:"POST",headers})).status).toBe(200);
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  expect(bob.codingSessions).toEqual([]);
+  expect(bob.runs[0]).toMatchObject({status:"failed",result:"Cancelled by a member."});
+  expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  const alice=await (await a.request("/api/workspace",{headers})).json();
+  expect(alice.codingSessions).toEqual([]);
+  expect(alice.runs[0].status).toBe("failed");
+  expect(alice.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+}));
+test("an unconnected coding Loop Run now is limited, not pending",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+  w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  const ran=await a.request("/api/loops/code/run",{method:"POST",headers});
+  expect(ran.status).toBe(200);
+  const payload=await ran.json();
+  expect(payload.run.status).toBe("limited");
+  expect(payload.pending).toBe(false);
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+  expect(bob.runs[0].status).toBe("limited");
+  expect(bob.runs[0].result).toContain("No session was started");
+}));
+test("a Loop GitHub write enqueues a pending Confirmation and confirm executes as the Connection owner",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{d.loops=[{id:"github-write",name:"Merge ready",prompt:"",category:"Engineering",trigger:"manual",action:"merge",enabled:true}];d.runs=[];d.inbox=[];});
+    await repo.commit(w.getSnapshot(),base);
+    calls.length=0;
+    const ran=await a.request("/api/loops/github-write/run",{method:"POST",headers});
+    expect(ran.status).toBe(200);
+    const payload=await ran.json();
+    expect(payload).toMatchObject({pending:true});
+    expect(payload.run.status).toBe("pending");
+    expect(putMerge(calls)).toEqual([]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    const confirmation=bob.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(confirmation.confirmation).toMatchObject({action:"merge",reviewId,loopRunId:payload.run.id});
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    expect(putMerge(calls)).toHaveLength(1);
+    const after=await (await a.request("/api/workspace",{headers})).json();
+    expect(after.runs[0]).toMatchObject({id:payload.run.id,status:"completed"});
+  } finally { globalThis.fetch=original; }
+}));
+test("dismissing a Loop GitHub write Confirmation fails the LoopRun as cancelled and does not merge",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{d.loops=[{id:"github-write",name:"Merge ready",prompt:"",category:"Engineering",trigger:"manual",action:"merge",enabled:true}];d.runs=[];d.inbox=[];});
+    await repo.commit(w.getSnapshot(),base);
+    calls.length=0;
+    expect((await a.request("/api/loops/github-write/run",{method:"POST",headers})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect((await b.request(`/api/inbox/${confirmation.id}/dismiss`,{method:"POST",headers})).status).toBe(200);
+    expect(putMerge(calls)).toEqual([]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.runs[0]).toMatchObject({status:"failed",result:"Cancelled by a member."});
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("an unconnected GitHub write Loop Run now is limited, not pending",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  w.mutate(d=>{d.loops=[{id:"github-write",name:"Merge ready",prompt:"",category:"Engineering",trigger:"manual",action:"merge",enabled:true}];d.runs=[];d.inbox=[];});
+  await repo.commit(w.getSnapshot(),base);
+  const ran=await a.request("/api/loops/github-write/run",{method:"POST",headers});
+  expect(ran.status).toBe(200);
+  const payload=await ran.json();
+  expect(payload.run.status).toBe("limited");
+  expect(payload.pending).toBe(false);
+  const bob=await (await b.request("/api/workspace",{headers})).json();
+  expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+  expect(bob.runs[0].result).toMatch(/not connected|No merge was sent/i);
+}));
+test("assign, raise-priority, summarize, and model Loop runs do not enqueue a Confirmation",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,modelCalls:string[]=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      modelCalls.push(`${init?.method??"GET"} ${url}`);
+      return new Response(JSON.stringify({choices:[{message:{content:'{"codingSession":{"issueId":"XXH-1"}}'}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{
+      d.loops=[
+        {id:"assign",name:"Assign",prompt:"",category:"Triage",trigger:"manual",action:"assign-owner",enabled:true,assignee:"Ada"},
+        {id:"priority",name:"Priority",prompt:"",category:"Triage",trigger:"manual",action:"raise-priority",enabled:true,minimumDemand:2},
+        {id:"summary",name:"Summary",prompt:"Summarize open work",category:"Reporting",trigger:"manual",action:"summarize",enabled:true},
+      ];
+      d.runs=[];d.inbox=[];
+    });
+    await repo.commit(w.getSnapshot(),base);
+    for(const id of ["assign","priority","summary"]) {
+      const ran=await a.request(`/api/loops/${id}/run`,{method:"POST",headers});
+      expect(ran.status).toBe(200);
+      expect(await ran.json()).toMatchObject({pending:false,run:{status:"completed"}});
+    }
+    expect(modelCalls).toEqual([]);
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-loop",baseUrl:"https://models.example",model:"gpt-4"})})).status).toBe(200);
+    const modeled=await a.request("/api/loops/summary/run",{method:"POST",headers});
+    expect(modeled.status).toBe(200);
+    const payload=await modeled.json();
+    expect(payload).toMatchObject({pending:false,run:{status:"completed"}});
+    expect(modelCalls).toEqual(["POST https://models.example/v1/chat/completions"]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+    expect(JSON.stringify(payload)).not.toContain("sk-loop");
+  } finally { globalThis.fetch=original; }
+}));

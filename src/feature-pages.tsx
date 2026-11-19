@@ -2341,6 +2341,7 @@ export function LoopsPage({ route }: PageProps) {
                     "raise-priority",
                     "coding-session",
                     "slack-reply",
+                    "merge",
                   ].map((a) => (
                     <option key={a} value={a}>
                       {a.replaceAll("-", " ")}

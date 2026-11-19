@@ -11,6 +11,7 @@ export interface AutomationAdapter {
     log?: string;
   };
   codingConfigured?(): boolean;
+  githubConfigured?(): boolean;
   startCodingSession?(issueId: string): {
     status: "completed" | "failed" | "limited";
     message: string;
