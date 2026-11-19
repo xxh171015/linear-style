@@ -308,15 +308,20 @@ test("admins paste, rotate and disconnect Connections while members see redacted
 }));
 test("GitHub Review sync stores a pull-request projection and refuses repos outside the allow list",async()=>fixture(async origin=>{
   const c=client(origin);await c.register();
-  const original=globalThis.fetch;
+  const original=globalThis.fetch,calls:string[]=[];
   globalThis.fetch=async(input,init)=>{
     const url=String(input);
-    if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
-    if(url.endsWith("/pulls/41"))return new Response(JSON.stringify({title:"Fix",user:{login:"octocat"},html_url:"https://github.com/acme/app/pull/41",merged:false,draft:false,state:"open",head:{sha:"abc"}}),{headers:{"Content-Type":"application/json"}});
-    if(url.endsWith("/files"))return new Response(JSON.stringify([{filename:"src/a.ts",status:"modified",patch:"+ok"}]),{headers:{"Content-Type":"application/json"}});
-    if(url.endsWith("/comments"))return new Response(JSON.stringify([{id:9,user:{login:"octocat"},body:"looks good",created_at:"2026-11-19T00:00:00Z"}]),{headers:{"Content-Type":"application/json"}});
-    if(url.includes("/status"))return new Response(JSON.stringify({statuses:[{context:"ci",state:"success"}]}),{headers:{"Content-Type":"application/json"}});
-    if(url.includes("/actions/runs"))return new Response(JSON.stringify({workflow_runs:[{name:"Tests",conclusion:"success",head_sha:"abc"}]}),{headers:{"Content-Type":"application/json"}});
+    if(url.startsWith("https://api.github.com")){
+      calls.push(`${init?.method??"GET"} ${url}`);
+      if(url.includes("/pulls/")&&url.endsWith("/comments"))throw new Error("line comments are out of scope");
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
+      if(url.endsWith("/pulls/41"))return new Response(JSON.stringify({title:"Fix",user:{login:"octocat"},html_url:"https://github.com/acme/app/pull/41",merged:false,draft:false,state:"open",head:{sha:"abc"}}),{headers:{"Content-Type":"application/json"}});
+      if(url.endsWith("/files"))return new Response(JSON.stringify([{filename:"src/a.ts",status:"modified",patch:"+ok"}]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/issues/41/comments"))return new Response(JSON.stringify([{id:9,user:{login:"octocat"},body:"looks good",created_at:"2026-11-19T00:00:00Z"}]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/status"))return new Response(JSON.stringify({statuses:[{context:"ci",state:"success"}]}),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/actions/runs"))return new Response(JSON.stringify({workflow_runs:[{name:"Tests",conclusion:"success",head_sha:"abc"}]}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${url}`);
+    }
     return original(input,init);
   };
   try {
@@ -327,18 +332,25 @@ test("GitHub Review sync stores a pull-request projection and refuses repos outs
     const reviews=await synced.json();
     expect(reviews[0]).toMatchObject({title:"Fix",github:{owner:"acme",repo:"app",number:41}});
     expect(reviews[0].diff).toContain("+ok");
-    expect(reviews[0].checks.some((item:{name:string})=>item.name==="ci"||item.name==="Tests")).toBe(true);
+    expect(reviews[0].checks).toEqual(expect.arrayContaining([{name:"ci",state:"success"},{name:"Tests",state:"success"}]));
+    expect(reviews[0].comments).toEqual([expect.objectContaining({author:"octocat",body:"looks good"})]);
+    expect(calls.some(line=>line.includes("/issues/41/comments"))).toBe(true);
+    expect(calls.some(line=>line.includes("/commits/abc/status"))).toBe(true);
+    expect(calls.some(line=>line.includes("/actions/runs"))).toBe(true);
+    expect(calls.some(line=>line.includes("/pulls/41/comments"))).toBe(false);
   } finally { globalThis.fetch=original; }
 }));
 function githubFetch(original:typeof fetch, calls:string[]) {
   return async(input:RequestInfo|URL,init?:RequestInit)=>{
     const url=String(input);
-    calls.push(`${init?.method??"GET"} ${url}`);
+    const method=init?.method??"GET";
+    calls.push(typeof init?.body==="string"?`${method} ${url} ${init.body}`:`${method} ${url}`);
+    if(url.includes("/pulls/")&&url.endsWith("/comments"))throw new Error("line comments are out of scope");
     if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
     if(url.endsWith("/pulls/41")&&(!init?.method||init.method==="GET"))return new Response(JSON.stringify({title:"Fix",user:{login:"octocat"},html_url:"https://github.com/acme/app/pull/41",merged:url.includes("unused"),draft:false,state:"open",head:{sha:"abc"}}),{headers:{"Content-Type":"application/json"}});
     if(url.endsWith("/files"))return new Response(JSON.stringify([{filename:"src/a.ts",status:"modified",patch:"+ok"}]),{headers:{"Content-Type":"application/json"}});
-    if(url.endsWith("/comments")&&(!init?.method||init.method==="GET"))return new Response(JSON.stringify([]),{headers:{"Content-Type":"application/json"}});
-    if(url.endsWith("/comments")&&init?.method==="POST")return new Response(JSON.stringify({id:11,user:{login:"octocat"},body:"ship it",created_at:"2026-11-19T00:00:00Z"}),{headers:{"Content-Type":"application/json"}});
+    if(url.includes("/issues/")&&url.endsWith("/comments")&&(!init?.method||init.method==="GET"))return new Response(JSON.stringify([]),{headers:{"Content-Type":"application/json"}});
+    if(url.includes("/issues/")&&url.endsWith("/comments")&&init?.method==="POST")return new Response(JSON.stringify({id:11,user:{login:"octocat"},body:"ship it",created_at:"2026-11-19T00:00:00Z"}),{headers:{"Content-Type":"application/json"}});
     if(url.includes("/status"))return new Response(JSON.stringify({statuses:[]}),{headers:{"Content-Type":"application/json"}});
     if(url.includes("/actions/runs"))return new Response(JSON.stringify({workflow_runs:[]}),{headers:{"Content-Type":"application/json"}});
     if(url.endsWith("/merge")&&init?.method==="PUT")return new Response(JSON.stringify({merged:true,sha:"def"}),{headers:{"Content-Type":"application/json"}});
@@ -346,6 +358,7 @@ function githubFetch(original:typeof fetch, calls:string[]) {
     return original(input,init);
   };
 }
+function putMerge(calls:string[]) {return calls.filter(line=>line.startsWith("PUT ")&&line.includes("/merge"));}
 test("GitHub merge waits for Confirmation and still reaches a member without a personal snapshot",async()=>fixture(async origin=>{
   const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
   const original=globalThis.fetch,calls:string[]=[];
@@ -356,13 +369,58 @@ test("GitHub merge waits for Confirmation and still reaches a member without a p
     const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
     const merge=await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"merge"})});
     expect(merge.status).toBe(200);expect(await merge.json()).toMatchObject({pending:true});
-    expect(calls.some(line=>line.startsWith("PUT ")&&line.endsWith("/merge"))).toBe(false);
+    expect(putMerge(calls)).toEqual([]);
     const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(confirmation.kind).toBe("confirmation");
     expect(confirmation.confirmation).toMatchObject({action:"merge",reviewId});
     expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
-    expect(calls.some(line=>line.startsWith("PUT ")&&line.endsWith("/merge"))).toBe(true);
+    expect(putMerge(calls)).toHaveLength(1);
+    expect(JSON.parse(putMerge(calls)[0].slice(putMerge(calls)[0].indexOf("{"))).merge_method).toBeUndefined();
     const alice=(await (await a.request("/api/workspace",{headers})).json()).inbox.find((item:{id:string})=>item.id===confirmation.id);
     expect(alice.archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("Approve and request-changes call GitHub immediately and are not Confirmations",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    expect((await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"approve"})})).status).toBe(200);
+    expect(calls.some(line=>line.startsWith("POST ")&&line.includes("/pulls/41/reviews")&&line.includes("APPROVE"))).toBe(true);
+    expect((await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"request-changes"})})).status).toBe(200);
+    expect(calls.some(line=>line.startsWith("POST ")&&line.includes("/pulls/41/reviews")&&line.includes("REQUEST_CHANGES"))).toBe(true);
+    expect(putMerge(calls)).toEqual([]);
+    const bob=(await (await b.request("/api/workspace",{headers})).json());
+    expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
+  } finally { globalThis.fetch=original; }
+}));
+test("dismissing a merge Confirmation does not merge and fails an attached LoopRun",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=githubFetch(original,calls);
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
+    const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    const merge=await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"merge"})});
+    expect(merge.status).toBe(200);
+    const confirmationId=(await merge.json()).confirmationId as string;
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{
+      d.runs.unshift({id:"run-wait",loopId:"github-write",time:new Date().toISOString(),status:"pending",result:"Waiting for confirmation.",issueIds:[],confirmationId});
+    });
+    await repo.commit(w.getSnapshot(),base);
+    expect((await b.request(`/api/inbox/${confirmationId}/dismiss`,{method:"POST",headers})).status).toBe(200);
+    expect(putMerge(calls)).toEqual([]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmationId).archivedAt).toBeTruthy();
+    expect(bob.runs.find((run:{id:string})=>run.id==="run-wait")).toMatchObject({status:"failed",result:"Cancelled by a member."});
+    const alice=await (await a.request("/api/workspace",{headers})).json();
+    expect(alice.inbox.find((item:{id:string})=>item.id===confirmationId).archivedAt).toBeTruthy();
+    expect(alice.runs.find((run:{id:string})=>run.id==="run-wait").status).toBe("failed");
   } finally { globalThis.fetch=original; }
 }));
 test("Agent replies 409 without a model and a coding Loop Confirmation runs the host argv",async()=>fixture(async origin=>{

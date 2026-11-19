@@ -168,6 +168,7 @@ test("offline settings, inbox Confirmation, reviews and cycles expose the connec
   await act(async()=>e.command({type:"navigate",route:"#/inbox"}));
   await act(async()=>host.querySelector<HTMLButtonElement>(".r-inbox-list button")!.click());
   expect(host.textContent).toContain("Confirming authorizes the Workspace Connection");
+  expect(host.textContent).toContain("GitHub writes appear as the PAT owner");
   await act(async()=>[...host.querySelectorAll("button")].find(button=>button.textContent==="Dismiss")!.click());
   expect(workspace.getSnapshot().inbox.find(item=>item.id==="confirm-merge")?.archivedAt).toBeTruthy();
   await act(async()=>e.command({type:"navigate",route:`#/reviews/${reviewId}`}));
