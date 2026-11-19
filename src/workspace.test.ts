@@ -714,3 +714,105 @@ test("invalid template saves cannot poison the workspace and editing never reviv
   w.setTemplateDeleted(id,false);w.saveIssueTemplate("Changed",fields,id);
   expect(migrateData(w.getSnapshot()).templates[0].name).toBe("Changed");
 });
+
+test("team triage destinations and Accept rotation replace the hardcoded Backlog/Canceled path", () => {
+  const w = fresh();
+  w.updateTeam("XXH", { triageAcceptStatus: "todo", triageDeclineStatus: "duplicate", triageRotation: ["Ada", "Bea"] });
+  const first = w.createIssue({ title: "one", status: "triage" });
+  w.triage(first.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === first.id)).toMatchObject({ status: "todo", assignee: "Ada" });
+  const second = w.createIssue({ title: "two", status: "triage" });
+  w.triage(second.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === second.id)?.assignee).toBe("Bea");
+  const third = w.createIssue({ title: "three", status: "triage" });
+  w.triage(third.id, "decline");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === third.id)?.status).toBe("duplicate");
+});
+
+test("required template fields block create until filled, then stamp the draft template", () => {
+  const w = fresh();
+  const projectId = w.getSnapshot().projects[0].id;
+  const id = w.saveIssueTemplate("Need project", { ...w.getSnapshot().draft, title: "From template" }, undefined, {
+    required: ["project", "priority"],
+  });
+  w.applyIssueTemplate(id);
+  expect(w.getSnapshot().draft.templateId).toBe(id);
+  const before = w.getSnapshot();
+  expect(() => w.createIssue(w.getSnapshot().draft)).toThrow(/project/);
+  expect(w.getSnapshot()).toBe(before);
+  w.mutate((d) => {
+    d.draft.projectId = projectId;
+    d.draft.priority = 2;
+  });
+  expect(w.createIssue(w.getSnapshot().draft).projectId).toBe(projectId);
+});
+
+test("a configured coding Loop enqueues a Confirmation instead of pretending to start", () => {
+  const w = new Workspace(initialData(), undefined, {
+    reviews: { transition: (review) => review },
+    automations: {
+      external: () => ({ status: "limited", message: "unused" }),
+      codingConfigured: () => true,
+      startCodingSession: (issueId) => ({ status: "completed", message: `started ${issueId}`, log: "ok" }),
+    },
+  });
+  w.mutate((d) => {
+    d.issues = [];
+    d.inbox = [];
+    d.loops = [{
+      id: "code",
+      name: "Autofix",
+      prompt: "",
+      category: "Engineering",
+      trigger: "triage",
+      action: "coding-session",
+      enabled: true,
+    }];
+    d.runs = [];
+  });
+  const issue = w.createIssue({ title: "bug", status: "triage" });
+  const run = w.getSnapshot().runs[0];
+  expect(run.status).toBe("pending");
+  const confirmation = w.getSnapshot().inbox.find((item) => item.kind === "confirmation");
+  expect(confirmation?.confirmation).toMatchObject({ action: "coding-session", issueId: issue.id, loopRunId: run.id });
+  w.dismissConfirmation(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("failed");
+  w.mutate((d) => {
+    d.runs[0].status = "pending";
+    delete d.inbox.find((item) => item.id === confirmation!.id)!.archivedAt;
+  });
+  w.confirmInbox(confirmation!.id);
+  expect(w.getSnapshot().runs[0].status).toBe("completed");
+  expect(w.getSnapshot().codingSessions[0].log).toBe("ok");
+});
+
+test("tick rolls a completed cycle and does not double-run a daily Loop", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.cycles = [{
+      id: "c-ended",
+      number: 1,
+      name: "Cycle 1",
+      startDate: "2026-11-09",
+      endDate: "2026-11-15",
+      capacity: 8,
+      description: "",
+      teamKey: "XXH",
+    }];
+    d.loops.push({
+      id: "daily",
+      name: "Daily",
+      prompt: "",
+      category: "Reporting",
+      trigger: "daily",
+      action: "summarize",
+      enabled: true,
+    });
+  });
+  const issue = w.createIssue({ title: "carry", cycleId: "c-ended", status: "review" });
+  w.tick(new Date("2026-11-16T12:00:00"));
+  expect(w.getSnapshot().issues.find((item) => item.id === issue.id)?.cycleId).not.toBe("c-ended");
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  w.tick(new Date("2026-11-16T18:00:00"));
+  expect(w.getSnapshot().runs).toHaveLength(1);
+});

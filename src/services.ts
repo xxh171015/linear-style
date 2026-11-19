@@ -8,6 +8,13 @@ export interface AutomationAdapter {
   external(action: Extract<LoopAction, "coding-session" | "slack-reply">): {
     status: "completed" | "limited" | "failed";
     message: string;
+    log?: string;
+  };
+  codingConfigured?(): boolean;
+  startCodingSession?(issueId: string): {
+    status: "completed" | "failed" | "limited";
+    message: string;
+    log?: string;
   };
 }
 export type ServiceAdapters = {

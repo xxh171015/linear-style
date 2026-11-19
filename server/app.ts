@@ -5,8 +5,14 @@ import { promisify } from "node:util";
 import { mkdirSync, chmodSync, existsSync, statSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { workspaceService, HTTPError, type Role } from "./workspaces";
-import { TEAM_KEY_PATTERN, initialData } from "../src/workspace";
+import { TEAM_KEY_PATTERN, initialData, uid } from "../src/workspace";
 import { decodeWorkspace, encodeWorkspace } from "../src/workspace-wire";
+import { connectionStore } from "./connections";
+import { assertAllowed, fetchPullReview, githubComment, githubLogin, githubTransition, parsePullRequestURL } from "./github";
+import { boundArgv, runCodingCommand } from "./coding";
+import { applySharedWorkspace, startWorkspaceJobs } from "./scheduler";
+import { modelReply } from "./agent";
+import type { GithubConfig, ModelConfig, CodingConfig } from "./connections";
 
 const hashPassword=promisify(scrypt), digest=(value:string)=>createHash("sha256").update(value).digest("hex");
 const ttl=7*86400000;
@@ -22,7 +28,11 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
     CREATE TABLE IF NOT EXISTS issue_sequences(workspace_id TEXT NOT NULL REFERENCES workspaces(user_id),prefix TEXT NOT NULL,next_issue INTEGER NOT NULL,PRIMARY KEY(workspace_id,prefix));`);
   if(!db.prepare("PRAGMA table_info(workspaces)").all().some(column=>column.name==="next_issue"))db.exec("ALTER TABLE workspaces ADD COLUMN next_issue INTEGER NOT NULL DEFAULT 1");
   const spaces=workspaceService(db);
+  const connections=connectionStore(db);
   const streams=new Map<string,Map<ServerResponse,string>>(),rates=new Map<string,{count:number;until:number}>();
+  function notifyWorkspace(id:string){for(const [stream] of streams.get(id)??[])if(!stream.writableEnded&&!stream.destroyed)stream.write("data: changed\n\n");}
+  const jobHooks={codingConfigured:(workspaceId:string)=>Boolean(connections.row(workspaceId,"coding"))};
+  const stopJobs=startWorkspaceJobs(db,(workspaceId,confirmations)=>{spaces.fanOutInbox(workspaceId,confirmations);notifyWorkspace(workspaceId);},jobHooks);
   function limit(key:string,max:number) {
     const now=Date.now();for(const [key,value] of rates)if(value.until<now)rates.delete(key);
     const bucket=rates.get(key)??{count:0,until:now+15*60000};
@@ -93,7 +103,7 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
             if(!name||name.length>80||!workspace||workspace.length>120)throw new HTTPError(400,"Enter your name and a workspace name.");
             const id=randomBytes(16).toString("hex"),salt=randomBytes(16).toString("hex"),hash=(await hashPassword(password,salt,64)) as Buffer;
             const data=initialData();
-            for(const key of ["issues","projects","views","milestones","initiatives","activity","inbox","reviews","attachments","chats","loops","runs","documents","templates","relations","favorites","labels"] as const)data[key]=[];
+            for(const key of ["issues","projects","views","milestones","initiatives","activity","inbox","reviews","attachments","chats","loops","runs","codingSessions","documents","templates","relations","favorites","labels"] as const)data[key]=[];
             data.settings={...data.settings,user:name,workspace};
             const wire=JSON.stringify(await encodeWorkspace(data));
             db.exec("BEGIN IMMEDIATE");
@@ -171,6 +181,161 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
           const timer=setInterval(()=>{try{user(req);spaces.membership(selected,account.id);res.write(": heartbeat\n\n");}catch{res.end();}},20000);
           res.on("close",()=>{clearInterval(timer);set.delete(res);if(!set.size)streams.delete(selected);});return;
         }
+        if(route==="/api/connections"&&method==="GET")return respond(res,200,connections.status(selected));
+        const connection=/^\/api\/connections\/(github|model|coding)$/.exec(route);
+        if(connection&&method==="DELETE"){spaces.admin(selected,account.id);connections.remove(selected,connection[1]);return respond(res,200,{ok:true});}
+        if(connection&&method==="PUT") {
+          spaces.admin(selected,account.id);
+          const input=await body(req);
+          if(connection[1]==="github") {
+            const token=typeof input.token==="string"?input.token.trim():"";
+            const repos=Array.isArray(input.repos)?input.repos.map((item:unknown)=>String(item).trim()).filter(Boolean):[];
+            if(!token||!repos.length)throw new HTTPError(400,"Paste a fine-grained GitHub token and at least one owner/repo.");
+            const login=await githubLogin(token);
+            connections.put(selected,"github",token,{repos,login} satisfies GithubConfig);
+          } else if(connection[1]==="model") {
+            const apiKey=typeof input.apiKey==="string"?input.apiKey.trim():"";
+            const baseUrl=typeof input.baseUrl==="string"?input.baseUrl.trim():"";
+            if(!apiKey||!baseUrl)throw new HTTPError(400,"Paste a model base URL and API key.");
+            try{new URL(baseUrl);}catch{throw new HTTPError(400,"Paste a model base URL and API key.");}
+            connections.put(selected,"model",apiKey,{baseUrl,model:typeof input.model==="string"?input.model.trim():undefined} satisfies ModelConfig);
+          } else {
+            const argv=Array.isArray(input.argv)?input.argv.map((item:unknown)=>String(item)):undefined;
+            const cwd=typeof input.cwd==="string"?input.cwd.trim():"";
+            if(!argv?.length||!cwd)throw new HTTPError(400,"Configure argv and an absolute working directory.");
+            connections.put(selected,"coding","",{argv,cwd,timeoutMs:Number(input.timeoutMs)||30*60*1000} satisfies CodingConfig);
+          }
+          return respond(res,200,connections.status(selected));
+        }
+        if(route==="/api/reviews/sync"&&method==="POST") {
+          const github=connections.row(selected,"github");if(!github)throw new HTTPError(409,"Connect GitHub before syncing Reviews.");
+          const config=JSON.parse(github.config) as GithubConfig;
+          const input=await body(req);
+          const snapshot=await applySharedWorkspace(db,selected,async workspace=>{
+            const existing=typeof input.reviewId==="string"?workspace.getSnapshot().reviews.find(review=>review.id===input.reviewId):undefined;
+            const ref=parsePullRequestURL(typeof input.url==="string"?input.url:existing?.url??"");
+            if(!ref)throw new HTTPError(400,"Enter a github.com pull request URL.");
+            assertAllowed(config.repos,ref);
+            const projection=await fetchPullReview(github.secret,ref);
+            workspace.mutate(data=>{
+              const match=data.reviews.find(review=>review.github?.owner===ref.owner&&review.github?.repo===ref.repo&&review.github?.number===ref.number)||(existing?data.reviews.find(review=>review.id===existing.id):undefined);
+              if(match)Object.assign(match,projection,{id:match.id});
+              else data.reviews.unshift({id:uid("review"),title:projection.title??`PR ${ref.number}`,author:projection.author??"",approved:!!projection.approved,...projection});
+            });
+          });
+          notifyWorkspace(selected);return respond(res,200,snapshot.reviews);
+        }
+        const reviewAction=/^\/api\/reviews\/([^/]+)\/(transition|comments)$/.exec(route);
+        if(reviewAction&&method==="POST") {
+          const github=connections.row(selected,"github");if(!github)throw new HTTPError(409,"Connect GitHub before changing a Review.");
+          const config=JSON.parse(github.config) as GithubConfig;
+          const input=await body(req);
+          const reviewId=decodeURIComponent(reviewAction[1]);
+          if(reviewAction[2]==="transition" && input.action==="merge") {
+            const review=spaces.read(selected,account).reviews.find(item=>item.id===reviewId);
+            if(!review?.github)throw new HTTPError(404,"This Review is not linked to GitHub.");
+            assertAllowed(config.repos,review.github);
+            const confirmation={id:uid("inbox"),issueId:review.issueIds?.[0]??review.id,kind:"confirmation" as const,text:`Confirm merge of ${review.title} as the Workspace GitHub PAT owner.`,time:new Date().toISOString(),read:false,confirmation:{action:"merge" as const,reviewId:review.id}};
+            spaces.fanOutInbox(selected,[confirmation]);
+            notifyWorkspace(selected);return respond(res,200,{pending:true,confirmationId:confirmation.id});
+          }
+          const snapshot=await applySharedWorkspace(db,selected,async workspace=>{
+            const review=workspace.getSnapshot().reviews.find(item=>item.id===reviewId);
+            if(!review?.github)throw new HTTPError(404,"This Review is not linked to GitHub.");
+            assertAllowed(config.repos,review.github);
+            if(reviewAction[2]==="comments") {
+              const text=typeof input.body==="string"?input.body.trim():"";
+              if(!text)throw new HTTPError(400,"Enter a comment.");
+              await githubComment(github.secret,review.github,text);
+            } else {
+              const action=input.action;
+              if(!["approve","request-changes"].includes(action))throw new HTTPError(400,"Choose approve, request-changes or merge.");
+              await githubTransition(github.secret,review.github,action);
+            }
+            const projection=await fetchPullReview(github.secret,review.github);
+            workspace.mutate(data=>{
+              const live=data.reviews.find(item=>item.id===review.id);if(live)Object.assign(live,projection,{id:review.id});
+            });
+          });
+          notifyWorkspace(selected);return respond(res,200,snapshot.reviews);
+        }
+        const loopRun=/^\/api\/loops\/([^/]+)\/run$/.exec(route);
+        if(loopRun&&method==="POST") {
+          const snapshot=await applySharedWorkspace(db,selected,workspace=>{
+            workspace.runLoop(decodeURIComponent(loopRun[1]));
+          },jobHooks);
+          const confirmations=snapshot.inbox.filter(item=>item.kind==="confirmation");
+          spaces.fanOutInbox(selected,confirmations);
+          notifyWorkspace(selected);return respond(res,200,{run:snapshot.runs[0],pending:confirmations.length>0});
+        }
+        const inboxAction=/^\/api\/inbox\/([^/]+)\/(confirm|dismiss)$/.exec(route);
+        if(inboxAction&&method==="POST") {
+          const id=decodeURIComponent(inboxAction[1]);
+          if(inboxAction[2]==="dismiss") {
+            const snapshot=await applySharedWorkspace(db,selected,workspace=>{
+              workspace.mutate(data=>{
+                const run=data.runs.find(item=>item.confirmationId===id&&item.status==="pending");
+                if(run){run.status="failed";run.result="Cancelled by a member.";}
+              });
+            });
+            spaces.archiveInboxItem(selected,id);
+            notifyWorkspace(selected);return respond(res,200,{ok:true,revision:snapshot.revision});
+          }
+          const loaded=spaces.read(selected,account);
+          const item=loaded.inbox.find(entry=>entry.id===id);
+          if(!item||item.kind!=="confirmation"||!item.confirmation)throw new HTTPError(404,"Confirmation not found.");
+          const request=item.confirmation;
+          if(request.action==="coding-session") {
+            const coding=connections.row(selected,"coding");
+            if(!coding)throw new HTTPError(409,"Configure a Coding session executor first.");
+            const config=JSON.parse(coding.config) as CodingConfig;
+            const snapshot=await applySharedWorkspace(db,selected,async workspace=>{
+              const issue=workspace.getSnapshot().issues.find(entry=>entry.id===(request.issueId||item.issueId)&&!entry.deletedAt);
+              if(!issue)throw new HTTPError(404,"Issue not found.");
+              const bound=boundArgv(config,{issueId:issue.id,title:issue.title});
+              const result=await runCodingCommand(bound.argv,bound.cwd,bound.timeoutMs);
+              workspace.mutate(data=>{
+                const run=data.runs.find(entry=>entry.id===request.loopRunId);
+                if(run){run.status=result.status;run.result=result.log;}
+                data.codingSessions.unshift({id:uid("coding"),issueId:issue.id,argv:bound.argv,cwd:bound.cwd,status:result.status,startedAt:new Date().toISOString(),endedAt:new Date().toISOString(),log:result.log,confirmationId:id});
+              });
+            });
+            spaces.archiveInboxItem(selected,id);notifyWorkspace(selected);return respond(res,200,{ok:true,revision:snapshot.revision});
+          }
+          if(request.action==="approve"||request.action==="request-changes"||request.action==="merge") {
+            const github=connections.row(selected,"github");if(!github)throw new HTTPError(409,"Connect GitHub first.");
+            const snapshot=await applySharedWorkspace(db,selected,async workspace=>{
+              if(!request.reviewId)throw new HTTPError(400,"Confirmation is missing a Review.");
+              const review=workspace.getSnapshot().reviews.find(entry=>entry.id===request.reviewId);
+              if(!review?.github)throw new HTTPError(404,"This Review is not linked to GitHub.");
+              await githubTransition(github.secret,review.github,request.action as "approve"|"request-changes"|"merge");
+              const projection=await fetchPullReview(github.secret,review.github);
+              workspace.mutate(data=>{
+                const live=data.reviews.find(entry=>entry.id===review.id);if(live)Object.assign(live,projection,{id:review.id});
+                const run=data.runs.find(entry=>entry.id===request.loopRunId);
+                if(run&&run.status==="pending"){run.status="completed";run.result=`Review ${request.action} confirmed.`;}
+              });
+            });
+            spaces.archiveInboxItem(selected,id);notifyWorkspace(selected);return respond(res,200,{ok:true,revision:snapshot.revision});
+          }
+          throw new HTTPError(400,"This Confirmation cannot be completed.");
+        }
+        if(route==="/api/agent/reply"&&method==="POST") {
+          const model=connections.row(selected,"model");
+          if(!model)return respond(res,409,{error:"Connect a model before using Agent inference.",fallback:true});
+          const config=JSON.parse(model.config) as ModelConfig;
+          const input=await body(req);
+          const text=typeof input.text==="string"?input.text:"";
+          if(!text.trim())throw new HTTPError(400,"Enter a message.");
+          const snapshot=spaces.read(selected,account);
+          const digest=snapshot.issues.filter(issue=>!issue.deletedAt).slice(0,40).map(issue=>`${issue.id} ${issue.status} ${issue.title}`).join("\n");
+          const message=await modelReply(config.baseUrl,model.secret,config.model,text,digest);
+          if(message.issueIds?.[0]) {
+            const confirmation={id:uid("inbox"),issueId:message.issueIds[0],kind:"confirmation" as const,text:`Confirm Coding session for ${message.issueIds[0]}`,time:new Date().toISOString(),read:false,confirmation:{action:"coding-session" as const,issueId:message.issueIds[0]}};
+            spaces.fanOutInbox(selected,[confirmation]);
+          }
+          return respond(res,200,{message});
+        }
         throw new HTTPError(404,"Not found.");
       }
       if(method!=="GET"&&method!=="HEAD")throw new HTTPError(405,"Method not allowed.");
@@ -188,6 +353,6 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
       respond(res,error instanceof HTTPError?error.status:500,{error:error instanceof HTTPError?error.message:"The server could not complete the request."});
     }
   });
-  server.on("close",()=>{for(const set of streams.values())for(const [stream] of set)stream.end();db.close();});
+  server.on("close",()=>{stopJobs();for(const set of streams.values())for(const [stream] of set)stream.end();db.close();});
   return server;
 }

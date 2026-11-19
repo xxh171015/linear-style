@@ -144,3 +144,34 @@ test("workspace More stays open after choosing Documents, Archive or Settings",a
   expect(host.querySelector(".r-workspace-more")).not.toBeNull();
   await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
 });
+
+test("offline settings, inbox Confirmation, reviews and cycles expose the connected-workspace controls",async()=>{
+  const e=environment(),workspace=new Workspace(initialData());
+  workspace.updateTeam("XXH",{cycleDurationDays:14,triageAcceptStatus:"todo",triageDeclineStatus:"duplicate"});
+  const reviewId=workspace.getSnapshot().reviews[0].id,issueId=workspace.getSnapshot().issues[0].id;
+  workspace.mutate(d=>{
+    d.inbox.unshift({id:"confirm-merge",issueId,kind:"confirmation",text:"Confirm merge of demo as the Workspace GitHub PAT owner.",time:new Date().toISOString(),read:false,confirmation:{action:"merge",reviewId}});
+  });
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);
+  await act(async()=>root.render(createElement(App,{workspace})));
+  await act(async()=>e.command({type:"settings"}));
+  expect(host.textContent).toContain("Cycle length (days)");
+  expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe("14");
+  expect(host.textContent).toContain("This device is offline");
+  expect(host.textContent).toContain("Issue templates");
+  await act(async()=>e.command({type:"navigate",route:"#/inbox"}));
+  await act(async()=>host.querySelector<HTMLButtonElement>(".r-inbox-list button")!.click());
+  expect(host.textContent).toContain("Confirming authorizes the Workspace Connection");
+  await act(async()=>[...host.querySelectorAll("button")].find(button=>button.textContent==="Dismiss")!.click());
+  expect(workspace.getSnapshot().inbox.find(item=>item.id==="confirm-merge")?.archivedAt).toBeTruthy();
+  await act(async()=>e.command({type:"navigate",route:`#/reviews/${reviewId}`}));
+  expect(host.textContent).toContain("Local review");
+  expect(host.textContent).toContain("Mark merged locally");
+  await act(async()=>e.command({type:"navigate",route:"#/cycles"}));
+  expect(host.textContent).toContain("14-day cycles");
+  await act(async()=>e.command({type:"navigate",route:"#/agent"}));
+  expect(host.textContent).toContain("Local assistant");
+  await act(async()=>e.command({type:"navigate",route:"#/loops"}));
+  expect(host.textContent).toContain("Schedules run while this app is open");
+  await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+});

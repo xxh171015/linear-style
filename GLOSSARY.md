@@ -1,6 +1,6 @@
 # Linear-style product
 
-This local workspace follows the observed Linear interface and interactions. Reference observations and offline-only rules are distinguished in docs/research/linear-parity/README.md. ADR-0005 supersedes the earlier five-state and flat-query restrictions.
+This local workspace follows the observed Linear interface and interactions. Reference observations and offline-only rules are distinguished in docs/research/linear-parity/README.md. ADR-0005 supersedes the earlier five-state and flat-query restrictions. ADR-0007 allows connected adapters after an explicit grant; unconnected use stays local.
 
 ## Language
 
@@ -9,7 +9,7 @@ A unit of work identified by a human identifier (`{teamKey}-{number}`). It belon
 _Avoid_: Ticket, task
 
 **Issue status**:
-A named state: backlog, todo, progress, review, done, canceled, duplicate, or triage. Categories are separate; progress and review are started, canceled and duplicate are canceled, and triage is its own category.
+A named state: backlog, todo, progress, review, done, canceled, duplicate, or triage. Categories are separate; progress and review are started, canceled and duplicate are canceled, and triage is its own category. The named state `review` (In Review) is not a Review.
 _Avoid_: WorkflowState, state, status category
 
 **Team**:
@@ -59,7 +59,6 @@ _Avoid_: CustomViewFilter (Linear's name for filtering the list of views), Issue
 My Issues, Team Issues, or a Project's Issues tab. These are queries, not Custom Views. They use separately persisted display preferences, without creating a Custom View record.
 _Avoid_: View, implicit view
 
-
 **Cycle**:
 A dated team iteration, with its own identity and optional Issue membership. Completed/Current/Upcoming/Planned are date-based display phases. The local capacity rule is explicitly a local default.
 
@@ -70,4 +69,29 @@ A higher-level grouping of Projects. Local progress uses the unique linked Issue
 The single-user offline document containing canonical entities, files, drafts, queries and preferences. All screens subscribe to its snapshots.
 
 **Loop**:
-A saved trigger, action and scope with a run history. Local triggers run while the app is open. Prompt text is context; an external model is not implied.
+A saved trigger, action and scope with a run history. It may call Agent and may run local assign or priority actions. A GitHub write or Coding session is enqueued as a Confirmation; the Loop does not start those itself. A Loop is not an Agent. Prompt text is the action's instruction.
+_Avoid_: automation (unqualified), agent (for this role), bot
+
+**Agent**:
+A conversational assistant over the Workspace, with a chat history. Distinct from Loop and from Coding session.
+_Avoid_: AI (unqualified), Copilot, bot
+
+**Review**:
+A record of a pull-request review, which may be linked to Issues. With a GitHub Connection it is a projection of a GitHub pull request; without one it may be a local pasted diff. Distinct from Issue status `review` (In Review).
+_Avoid_: PR, pull request (as a second entity), review (unqualified)
+
+**Coding session**:
+An external execution that applies a change against a code repository. Distinct from Agent chat and from Review.
+_Avoid_: agent run, terminal session
+
+**Template**:
+A reusable draft of Issue fields, applied when creating an Issue.
+_Avoid_: form, snippet, project template, document template
+
+**Connection**:
+A Workspace-level grant to call one external system. Distinct from a Confirmation.
+_Avoid_: integration, OAuth, credential, token
+
+**Confirmation**:
+An explicit member action that authorizes one mutating adapter call. It is an Inbox kind, distinct from a reminder and from activity, and stays there until confirmed or dismissed. Distinct from connecting a Connection and from Review approve.
+_Avoid_: permission, approve, grant (unqualified)

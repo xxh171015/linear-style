@@ -1,5 +1,7 @@
 # Reference-led states, queries and an offline workspace
 
+Partly superseded by [ADR-0007](0007-connected-adapters.md): outbound GitHub, model, and coding-session calls are allowed after an explicit Workspace connection. Named states, queries, and the Workspace snapshot boundary in this ADR still stand.
+
 Supersedes ADR-0001 and revises the restrictions in ADR-0003/0004. The explicit user request is now to match the observed Linear interface and interactions instead of preserving the original simplified replica subset.
 
 Named Issue states are Backlog, Todo, In Progress, In Review, Done, Canceled, Duplicate and Triage. State categories are separate: In Progress/In Review are started; Canceled/Duplicate are canceled; Triage is its own category. Duplicate and parent references are distinct and validated against cycles.

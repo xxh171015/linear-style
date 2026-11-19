@@ -438,6 +438,24 @@
   gap: 8px;
   align-items: center;
 }
+.r-settings-list li.r-team-settings {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid #2a2a33;
+}
+.r-team-settings-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.r-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 520px;
+}
 .r-team-name > svg {
   width: 10px;
   height: 10px;

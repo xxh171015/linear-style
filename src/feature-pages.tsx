@@ -5,14 +5,18 @@ import * as I from "./icons";
 import {
   createKernel,
   estimateProgress,
+  ISSUE_STATUSES,
   PROJECT_STATUSES,
   PRIORITY_LABEL,
+  STATUS_LABEL,
 } from "./kernel";
 import { HEALTH_LABEL, PROJECT_STATUS_LABEL } from "./logic";
 import type {
+  ConnectionStatus,
   CustomView,
   Cycle,
   Initiative,
+  IssueStatus,
   Loop,
   Priority,
   Project,
@@ -55,8 +59,10 @@ import {
 } from "./workspace";
 import { LABEL_COLOR_OPTIONS, LABEL_COLORS } from "./data";
 import { navigate, type Route } from "./router";
-import { accountApiBase, accountEnabled, setAccountApiBase, setAccountEnabled } from "./remote-repository";
+import { accountApiBase, accountEnabled, accountRequest, serverRequest, setAccountApiBase, setAccountEnabled, ServerError } from "./remote-repository";
 import { localAgent } from "./adapters";
+import { parsePullRequestURL } from "./github";
+import { cycleDurationDays } from "./jobs";
 import { IssueTemplateSettings } from "./template-ui";
 import { ProjectCollection } from "./project-views";
 import { scheduleDates } from "./timeline";
@@ -91,6 +97,67 @@ export function PageHeader({
     </>
   );
 }
+function useAccountApi() {
+  const account = useContext(AccountContext);
+  const connected = Boolean(account?.membership);
+  const request = (path: string, init?: RequestInit) => {
+    if (!account?.membership) throw Error("Sign in to use Workspace Connections.");
+    return serverRequest(path, init, accountRequest(account.user.id, account.membership.id));
+  };
+  return { account, connected, request };
+}
+
+function ReviewActions({ review }: { review: Review }) {
+  const { account, connected, request } = useAccountApi();
+  const workspace = useWorkspace();
+  const [busy, setBusy] = useState("");
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  async function act(action: "approve" | "request-changes" | "merge") {
+    if (busy) return;
+    setBusy(action);
+    setError("");
+    setNotice("");
+    try {
+      if (connected && review.github) {
+        const result = await request(`/api/reviews/${encodeURIComponent(review.id)}/transition`, {
+          method: "POST",
+          body: JSON.stringify({ action }),
+        });
+        if (result?.pending) setNotice("Merge is waiting in Inbox as a Confirmation. GitHub writes appear as the Workspace PAT owner.");
+        await workspace.refreshShared();
+      } else workspace.transitionReview(review.id, action);
+    } catch (e) {
+      if (e instanceof ServerError && e.status === 409) workspace.transitionReview(review.id, action);
+      else setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+  return (
+    <div className="r-stack">
+      <div className="r-inline">
+        <Button disabled={!!busy} onClick={() => void act("request-changes")}>
+          Request changes
+        </Button>
+        <Button primary disabled={!!busy} onClick={() => void act("approve")}>
+          Approve
+        </Button>
+        <Button disabled={!!busy} onClick={() => void act("merge")}>
+          {connected && review.github ? "Request merge" : "Mark merged locally"}
+        </Button>
+      </div>
+      {connected && review.github && (
+        <p className="r-muted">
+          Approve and conversation comments go to GitHub now. Merge waits for Inbox Confirmation and appears as the PAT owner, not as {account?.user.name ?? "you"}.
+        </p>
+      )}
+      {notice && <p className="r-muted">{notice}</p>}
+      {error && <p role="alert" className="r-error">{error}</p>}
+    </div>
+  );
+}
+
 function Tabs({
   items,
   value,
@@ -166,7 +233,7 @@ export function CyclesPage({ route, onIssue, onCreate }: PageProps) {
   const newCycle = () => {
     const start = new Date();
     const end = new Date(start);
-    end.setDate(end.getDate() + 6);
+    end.setDate(end.getDate() + cycleDurationDays(team) - 1);
     setEditing({
       id: uid("cycle"),
       number: Math.max(0, ...data.cycles.map((c) => c.number)) + 1,
@@ -260,6 +327,9 @@ export function CyclesPage({ route, onIssue, onCreate }: PageProps) {
         </>
       ) : (
         <div className="r-cycle-list">
+          <p className="r-muted">
+            This team uses {cycleDurationDays(team)}-day cycles. When a cycle ends, unfinished issues (including In Review) move to the next cycle. The account server creates the next cycle automatically.
+          </p>
           {[...cycles]
             .sort((a, b) => b.startDate.localeCompare(a.startDate))
             .map((c) => {
@@ -1306,9 +1376,11 @@ export function InitiativesPage({ route }: PageProps) {
 export function ReviewsPage({ route, onIssue }: PageProps) {
   const data = useData(),
     workspace = useWorkspace();
+  const { account, connected, request } = useAccountApi();
   const [tab, setTab] = useState("Created"),
     [edit, setEdit] = useState<Review | null>(null),
-    [comment, setComment] = useState("");
+    [comment, setComment] = useState(""),
+    [commentError, setCommentError] = useState("");
   const review = data.reviews.find((r) => r.id === route.id);
   const [group, setGroup] = useState("status");
   const patch = (update: Partial<Review>) =>
@@ -1317,6 +1389,33 @@ export function ReviewsPage({ route, onIssue }: PageProps) {
       Object.assign(r, update);
       r.approved = r.status === "ready" || r.status === "merged";
     });
+  useEffect(() => {
+    if (!connected) return;
+    let cancelled = false;
+    const sync = async () => {
+      const current = workspace.getSnapshot().reviews;
+      const targets = review
+        ? current.filter((item) => item.id === review.id && (item.url || item.github))
+        : current.filter((item) => item.github || (item.url && parsePullRequestURL(item.url)));
+      for (const item of targets.slice(0, 8)) {
+        try {
+          await request("/api/reviews/sync", {
+            method: "POST",
+            body: JSON.stringify({ url: item.url, reviewId: item.id }),
+          });
+        } catch {
+          /* Keep the last saved projection. */
+        }
+      }
+      if (!cancelled) await workspace.refreshShared().catch(() => {});
+    };
+    void sync();
+    const timer = setInterval(() => void sync(), 60_000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [connected, account?.membership?.id, review?.id]);
   return (
     <>
       <PageHeader
@@ -1356,7 +1455,7 @@ export function ReviewsPage({ route, onIssue }: PageProps) {
             <Button onClick={() => navigate({ nav: "reviews" })}>
               All reviews
             </Button>
-            <span className="r-chip">Local review</span>
+            <span className="r-chip">{review.github ? "GitHub review" : "Local review"}</span>
             <select
               aria-label="Review status"
               value={review.status ?? "review"}
@@ -1413,26 +1512,12 @@ export function ReviewsPage({ route, onIssue }: PageProps) {
                 No patch attached. Add a diff in Edit review.
               </p>
             )}
-            <div className="r-inline">
-              <Button
-                onClick={() =>
-                  workspace.transitionReview(review.id, "request-changes")
-                }
-              >
-                Request changes
-              </Button>
-              <Button
-                primary
-                onClick={() => workspace.transitionReview(review.id, "approve")}
-              >
-                Approve
-              </Button>
-              <Button
-                onClick={() => workspace.transitionReview(review.id, "merge")}
-              >
-                Mark merged locally
-              </Button>
-            </div>
+            {review.checks?.length ? (
+              <p className="r-muted">
+                Checks: {review.checks.map((item) => `${item.name} ${item.state}`).join(" · ")}
+              </p>
+            ) : null}
+            <ReviewActions review={review} />
             <h3>Discussion</h3>
             {review.comments?.map((c) => (
               <div className="r-review-comment" key={c.id}>
@@ -1447,27 +1532,45 @@ export function ReviewsPage({ route, onIssue }: PageProps) {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!comment.trim()) return;
-                patch({
-                  comments: [
-                    ...(review.comments ?? []),
-                    {
-                      id: uid("comment"),
-                      author: data.settings.user,
-                      body: comment,
-                      time: stamp(),
-                    },
-                  ],
-                });
+                const body = comment.trim();
                 setComment("");
+                setCommentError("");
+                void (async () => {
+                  try {
+                    if (connected && review.github) {
+                      await request(`/api/reviews/${encodeURIComponent(review.id)}/comments`, {
+                        method: "POST",
+                        body: JSON.stringify({ body }),
+                      });
+                      await workspace.refreshShared();
+                    } else {
+                      patch({
+                        comments: [
+                          ...(review.comments ?? []),
+                          {
+                            id: uid("comment"),
+                            author: data.settings.user,
+                            body,
+                            time: stamp(),
+                          },
+                        ],
+                      });
+                    }
+                  } catch (error) {
+                    setComment(body);
+                    setCommentError(error instanceof Error ? error.message : String(error));
+                  }
+                })();
               }}
             >
               <Field label="Comment">
                 <textarea
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
-                  placeholder="Leave a comment…"
+                  placeholder="Leave a conversation comment…"
                 />
               </Field>
+              {commentError && <p role="alert" className="r-error">{commentError}</p>}
               <Button type="submit" disabled={!comment.trim()}>
                 Comment
               </Button>
@@ -1558,13 +1661,23 @@ export function ReviewsPage({ route, onIssue }: PageProps) {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              const saved = edit;
               workspace.mutate((d) => {
-                const index = d.reviews.findIndex((r) => r.id === edit.id);
-                if (index < 0) d.reviews.push(edit);
-                else d.reviews[index] = edit;
+                const index = d.reviews.findIndex((r) => r.id === saved.id);
+                if (index < 0) d.reviews.push(saved);
+                else d.reviews[index] = saved;
               });
               setEdit(null);
-              navigate({ nav: "reviews", id: edit.id });
+              navigate({ nav: "reviews", id: saved.id });
+              if (connected && parsePullRequestURL(saved.url ?? "")) {
+                void workspace.flushed().then(async () => {
+                  await request("/api/reviews/sync", {
+                    method: "POST",
+                    body: JSON.stringify({ url: saved.url, reviewId: saved.id }),
+                  });
+                  await workspace.refreshShared();
+                }).catch(() => {});
+              }
             }}
           >
             <Field label="Title">
@@ -1638,6 +1751,7 @@ export function ReviewsPage({ route, onIssue }: PageProps) {
 export function AgentPage({ route, onIssue, onCreate }: PageProps) {
   const data = useData(),
     workspace = useWorkspace();
+  const { connected, request } = useAccountApi();
   const chat = data.chats.find((c) => c.id === route.id);
   const [text, setText] = useState(""),
     [pending, setPending] = useState(false),
@@ -1679,7 +1793,21 @@ export function AgentPage({ route, onIssue, onCreate }: PageProps) {
           if (file.ownerId === "agent-draft") file.ownerId = chatId;
       });
       setText("");
-      const message = await localAgent.reply(input, workspace.getSnapshot());
+      let message;
+      if (connected) {
+        try {
+          const result = await request("/api/agent/reply", {
+            method: "POST",
+            body: JSON.stringify({ text: input }),
+          });
+          message = result.message;
+          await workspace.refreshShared();
+        } catch (e) {
+          if (e instanceof ServerError && e.status === 409)
+            message = await localAgent.reply(input, workspace.getSnapshot());
+          else throw e;
+        }
+      } else message = await localAgent.reply(input, workspace.getSnapshot());
       workspace.mutate((d) => {
         d.chats.find((c) => c.id === chatId)!.messages.push(message);
       });
@@ -1733,7 +1861,9 @@ export function AgentPage({ route, onIssue, onCreate }: PageProps) {
                   <small>
                     {m.role === "user"
                       ? data.settings.user
-                      : "Linear · Local assistant"}
+                      : connected
+                        ? "Linear · Connected model"
+                        : "Linear · Local assistant"}
                   </small>
                   <p>{m.text}</p>
                   {m.issueIds?.map((id) => (
@@ -1807,7 +1937,7 @@ export function AgentPage({ route, onIssue, onCreate }: PageProps) {
             />
             <footer>
               <FileInput ownerId={chat?.id ?? "agent-draft"} />
-              <span className="r-local-mode">Local assistant</span>
+              <span className="r-local-mode">{connected ? "Connected model" : "Local assistant"}</span>
               <span className="r-push" />
               <Button type="submit" disabled={!text.trim() || pending}>
                 {pending ? "Thinking…" : "Send message"}
@@ -1843,8 +1973,9 @@ export function AgentPage({ route, onIssue, onCreate }: PageProps) {
             </div>
           )}
           <p className="r-service-note">
-            Works with local workspace data. Files are stored locally; their
-            contents are not analyzed by a model.
+            {connected
+              ? "When a model Connection is set, Agent calls that OpenAI-compatible endpoint. Proposed Coding sessions wait in Inbox. Files stay on this workspace; their bytes are not sent unless you paste them."
+              : "Works with local workspace data. Files are stored locally; their contents are not analyzed by a model."}
           </p>
         </div>
       </div>
@@ -1911,6 +2042,11 @@ export function AgentPage({ route, onIssue, onCreate }: PageProps) {
 export function LoopsPage({ route }: PageProps) {
   const data = useData(),
     workspace = useWorkspace();
+  const { connected, request } = useAccountApi();
+  const [runError, setRunError] = useState("");
+  const loopNote = connected
+    ? "Schedules run on the account server. GitHub writes and Coding sessions wait in Inbox as Confirmation. limited means the adapter is not connected, not that a run is waiting."
+    : "Schedules run while this app is open. External coding and Slack actions report a service limitation and never send data.";
   const [category, setCategory] = useState("Featured"),
     [tab, setTab] = useState("My loops"),
     [prompt, setPrompt] = useState(""),
@@ -1958,7 +2094,22 @@ export function LoopsPage({ route }: PageProps) {
           <h1>{loop.name}</h1>
           <p>{loop.prompt}</p>
           <div className="r-inline">
-            <Button primary onClick={() => workspace.runLoop(loop.id)}>
+            <Button
+              primary
+              onClick={() => {
+                setRunError("");
+                void (async () => {
+                  try {
+                    if (connected) {
+                      await request(`/api/loops/${encodeURIComponent(loop.id)}/run`, { method: "POST" });
+                      await workspace.refreshShared();
+                    } else workspace.runLoop(loop.id);
+                  } catch (e) {
+                    setRunError(e instanceof Error ? e.message : String(e));
+                  }
+                })();
+              }}
+            >
               Run now
             </Button>
             <Button
@@ -1972,10 +2123,8 @@ export function LoopsPage({ route }: PageProps) {
               {loop.enabled ? "Pause loop" : "Enable loop"}
             </Button>
           </div>
-          <p className="r-service-note">
-            Schedules run while this app is open. External coding and Slack
-            actions report a service limitation and never send data.
-          </p>
+          {runError && <p role="alert" className="r-error">{runError}</p>}
+          <p className="r-service-note">{loopNote}</p>
           <h3>Run history</h3>
           {data.runs
             .filter((r) => r.loopId === loop.id)
@@ -2111,6 +2260,7 @@ export function LoopsPage({ route }: PageProps) {
               ))}
             </div>
           </div>
+          <p className="r-service-note">{loopNote}</p>
         </>
       )}
       {edit && (
@@ -2306,6 +2456,7 @@ export function HomePage({ onIssue, onCreate }: PageProps) {
 }
 export function InboxPage({ onIssue }: PageProps) {
   const data = useData(), workspace = useWorkspace();
+  const { connected, request } = useAccountApi();
   const now = useNotificationTime(data.inbox);
   const [unread, setUnread] = useState(false),
     [search, setSearch] = useState(""),
@@ -2363,7 +2514,29 @@ export function InboxPage({ onIssue }: PageProps) {
       <div className="r-inbox-preview">{item ? <div>
         <Button className="r-inbox-back" onClick={() => setSelected(null)}>← Notifications</Button>
         <h2>{item.issueId}</h2><p>{item.text}</p><p>{issue?.title ?? "This issue is no longer available."}</p>
+        {item.kind === "confirmation" && <p className="r-muted">Confirming authorizes the Workspace Connection. GitHub writes appear as the PAT owner, not as the member who clicks Confirm.</p>}
         <div className="r-notification-actions">
+          {item.kind === "confirmation" && folder === "inbox" && !item.archivedAt && <>
+            <Button primary onClick={() => void (async () => {
+              try {
+                if (connected) {
+                  await request(`/api/inbox/${encodeURIComponent(item.id)}/confirm`, { method: "POST" });
+                  await workspace.refreshShared();
+                } else workspace.confirmInbox(item.id);
+                setSelected(null); setError("");
+              } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+            })()}>Confirm</Button>
+            <Button onClick={() => void (async () => {
+              try {
+                if (connected) {
+                  await request(`/api/inbox/${encodeURIComponent(item.id)}/dismiss`, { method: "POST" });
+                  await workspace.refreshShared();
+                } else workspace.dismissConfirmation(item.id);
+                setSelected(null); setError("");
+              } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+            })()}>Dismiss</Button>
+          </>}
+          {error && <p role="alert" className="r-error">{error}</p>}
           {issue && <Button onClick={() => onIssue(item.issueId)}>Open issue</Button>}
           <Button onClick={() => workspace.updateNotification(item.id, item.read ? "unread" : "read")}>{item.read ? "Mark unread" : "Mark read"}</Button>
           {folder !== "inbox" && <Button onClick={() => act("restore")}>Move to inbox</Button>}
@@ -2652,6 +2825,149 @@ export function ViewsPage({ route, onIssue, onCreate }: PageProps) {
     </>
   );
 }
+
+function ConnectionsSettings() {
+  const { account, connected, request } = useAccountApi();
+  const admin = account?.membership?.role === "admin";
+  const [status, setStatus] = useState<ConnectionStatus | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState("");
+  const [githubToken, setGithubToken] = useState("");
+  const [githubRepos, setGithubRepos] = useState("");
+  const [modelUrl, setModelUrl] = useState("");
+  const [modelKey, setModelKey] = useState("");
+  const [modelName, setModelName] = useState("");
+  const [argv, setArgv] = useState("");
+  const [cwd, setCwd] = useState("");
+  useEffect(() => {
+    if (!connected) return;
+    void request("/api/connections")
+      .then((value: ConnectionStatus) => {
+        setStatus(value);
+        setGithubRepos(value.github?.repos?.join(", ") ?? "");
+        setModelUrl(value.model?.baseUrl ?? "");
+        setModelName(value.model?.model ?? "");
+        setArgv(value.coding?.argv?.join("\n") ?? "");
+        setCwd(value.coding?.cwd ?? "");
+      })
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)));
+  }, [connected, account?.membership?.id]);
+  if (!connected) return null;
+  async function save(kind: "github" | "model" | "coding", body: unknown) {
+    setBusy(kind);
+    setError("");
+    try {
+      setStatus(await request(`/api/connections/${kind}`, { method: "PUT", body: JSON.stringify(body) }));
+      if (kind === "github") setGithubToken("");
+      if (kind === "model") setModelKey("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+  async function remove(kind: "github" | "model" | "coding") {
+    setBusy(kind);
+    setError("");
+    try {
+      await request(`/api/connections/${kind}`, { method: "DELETE" });
+      setStatus(await request("/api/connections"));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy("");
+    }
+  }
+  return (
+    <section>
+      <h2>Connections</h2>
+      <p className="r-muted">
+        Admins paste secrets here. They stay on the account server. GitHub mutations appear as the PAT owner. Members can use a connected adapter; they cannot see the token.
+      </p>
+      {error && <p role="alert" className="r-error">{error}</p>}
+      <h3>GitHub</h3>
+      <p className="r-muted">
+        {status?.github?.connected
+          ? `Connected${status.github.login ? ` as ${status.github.login}` : ""}. Allowed repos: ${status.github.repos.join(", ") || "none"}.`
+          : "Not connected. Fine-grained PAT: metadata read, contents read, pull requests write, commit statuses read, actions read."}
+      </p>
+      {admin && (
+        <form
+          className="r-stack"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save("github", {
+              token: githubToken,
+              repos: githubRepos.split(",").map((item) => item.trim()).filter(Boolean),
+            });
+          }}
+        >
+          <Field label="Fine-grained personal access token">
+            <input type="password" autoComplete="off" value={githubToken} onChange={(e) => setGithubToken(e.target.value)} placeholder="github_pat_…" />
+          </Field>
+          <Field label="Allowed repositories (owner/repo)">
+            <input value={githubRepos} onChange={(e) => setGithubRepos(e.target.value)} placeholder="acme/app, acme/web" />
+          </Field>
+          <div className="r-inline">
+            <Button primary type="submit" disabled={!!busy || !githubToken.trim()}>Save GitHub</Button>
+            {status?.github?.connected && <Button type="button" disabled={!!busy} onClick={() => void remove("github")}>Disconnect GitHub</Button>}
+          </div>
+        </form>
+      )}
+      <h3>Model</h3>
+      <p className="r-muted">
+        {status?.model?.connected
+          ? `Connected${status.model.model ? ` · ${status.model.model}` : ""} at ${status.model.baseUrl ?? "the saved URL"}.`
+          : "Not connected. OpenAI-compatible HTTP, with an API key."}
+      </p>
+      {admin && (
+        <form
+          className="r-stack"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save("model", { baseUrl: modelUrl, apiKey: modelKey, model: modelName || undefined });
+          }}
+        >
+          <Field label="Base URL"><input type="url" required value={modelUrl} onChange={(e) => setModelUrl(e.target.value)} placeholder="https://api.openai.com" /></Field>
+          <Field label="API key"><input type="password" autoComplete="off" value={modelKey} onChange={(e) => setModelKey(e.target.value)} /></Field>
+          <Field label="Model name"><input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder="optional" /></Field>
+          <div className="r-inline">
+            <Button primary type="submit" disabled={!!busy || !modelUrl.trim() || !modelKey.trim()}>Save model</Button>
+            {status?.model?.connected && <Button type="button" disabled={!!busy} onClick={() => void remove("model")}>Disconnect model</Button>}
+          </div>
+        </form>
+      )}
+      <h3>Coding session</h3>
+      <p className="r-muted">
+        {status?.coding?.configured
+          ? `Configured in ${status.coding.cwd}. One argument per line; whole tokens {issueId} {title} {repoPath} only.`
+          : "Not configured. The account-server host runs argv in an absolute working directory. No secrets are copied into the child environment."}
+      </p>
+      {admin && (
+        <form
+          className="r-stack"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void save("coding", {
+              argv: argv.split("\n").map((item) => item.trimEnd()).filter((item) => item.length),
+              cwd,
+            });
+          }}
+        >
+          <Field label="Command (one argument per line)">
+            <textarea className="r-code" value={argv} onChange={(e) => setArgv(e.target.value)} placeholder={"tool\n{issueId}"} />
+          </Field>
+          <Field label="Working directory"><input value={cwd} onChange={(e) => setCwd(e.target.value)} placeholder="/absolute/path" /></Field>
+          <div className="r-inline">
+            <Button primary type="submit" disabled={!!busy || !argv.trim() || !cwd.trim()}>Save coding executor</Button>
+            {status?.coding?.configured && <Button type="button" disabled={!!busy} onClick={() => void remove("coding")}>Remove coding executor</Button>}
+          </div>
+        </form>
+      )}
+    </section>
+  );
+}
+
 export function SettingsPage({section,invite=false}:{section?:string;invite?:boolean}) {
   const account=useContext(AccountContext);
   const data = useAllData(),
@@ -2694,6 +3010,7 @@ export function SettingsPage({section,invite=false}:{section?:string;invite?:boo
       <div className="r-document r-settings">
         {account&&<section><h2>Account</h2><p>Signed in as {account.user.email}</p><p className="r-muted">Shared workspace records are saved on this server. Your drafts, inbox, favorites and chats stay private to your account.</p><div className="r-inline"><Button onClick={account.reconnect}>Reconnect account</Button><Button onClick={()=>void account.signOut().catch(error=>setError(error instanceof Error?error.message:String(error)))}>Sign out</Button></div></section>}
         <WorkspaceAccounts/>{account&&<Button onClick={()=>navigate({nav:"settings",id:"members"})}>Manage members</Button>}
+        <ConnectionsSettings/>
         <h2>Workspace</h2>
         <Field label="Workspace name">
           <input
@@ -2765,12 +3082,59 @@ export function SettingsPage({section,invite=false}:{section?:string;invite?:boo
         <p className="r-muted">Issues are identified as {"{team key}-{number}"}. Switching teams changes Home, Triage, Issues and Cycles.</p>
         <ul className="r-settings-list">
           {data.teams.map((item) => (
-            <li key={item.id}>
-              <span className="r-team-key">{item.key}</span>
-              {item.name}
-              {item.key === data.settings.currentTeamKey ? " · current" : (
-                <Button onClick={() => workspace.setCurrentTeam(item.key)}>Switch</Button>
-              )}
+            <li className="r-team-settings" key={item.id}>
+              <div className="r-team-settings-head">
+                <span className="r-team-key">{item.key}</span>
+                {item.name}
+                {item.key === data.settings.currentTeamKey ? " · current" : (
+                  <Button onClick={() => workspace.setCurrentTeam(item.key)}>Switch</Button>
+                )}
+              </div>
+              <div className="r-form-grid">
+                <Field label="Cycle length (days)">
+                  <input
+                    type="number"
+                    min={1}
+                    max={366}
+                    value={item.cycleDurationDays ?? 7}
+                    onChange={(e) => {
+                      const n = Number(e.target.value);
+                      if (!Number.isInteger(n) || n < 1 || n > 366) return;
+                      try { workspace.updateTeam(item.key, { cycleDurationDays: n }); setError(""); }
+                      catch (err) { setError(err instanceof Error ? err.message : String(err)); }
+                    }}
+                  />
+                </Field>
+                <Field label="Triage accept">
+                  <select
+                    value={item.triageAcceptStatus ?? "backlog"}
+                    onChange={(e) => workspace.updateTeam(item.key, { triageAcceptStatus: e.target.value as IssueStatus })}
+                  >
+                    {ISSUE_STATUSES.filter((status) => status !== "triage").map((status) => (
+                      <option key={status} value={status}>{STATUS_LABEL[status]}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Triage decline">
+                  <select
+                    value={item.triageDeclineStatus ?? "canceled"}
+                    onChange={(e) => workspace.updateTeam(item.key, { triageDeclineStatus: e.target.value as IssueStatus })}
+                  >
+                    {ISSUE_STATUSES.filter((status) => status !== "triage").map((status) => (
+                      <option key={status} value={status}>{STATUS_LABEL[status]}</option>
+                    ))}
+                  </select>
+                </Field>
+                <Field label="Accept rotation">
+                  <input
+                    defaultValue={(item.triageRotation ?? []).join(", ")}
+                    placeholder="Ada, Bea"
+                    onBlur={(e) => workspace.updateTeam(item.key, {
+                      triageRotation: e.target.value.split(",").map((name) => name.trim()).filter(Boolean),
+                    })}
+                  />
+                </Field>
+              </div>
             </li>
           ))}
         </ul>
@@ -2869,8 +3233,9 @@ export function SettingsPage({section,invite=false}:{section?:string;invite?:boo
         </div>
         <h3>Integrations</h3>
         <p>
-          Agent, reviews and automations run locally. No credentials or remote
-          services are connected.
+          {account
+            ? "GitHub, model and coding Connections live in this Settings page. Unconnected adapters stay limited and never pretend to succeed."
+            : "This device is offline. Agent, reviews and automations stay local until you sign in and an admin pastes a Connection."}
         </p>
         <h3>Keyboard shortcuts</h3>
         <p>
