@@ -435,3 +435,39 @@ test("hosted interval Loops tick once per period and retry a failed run after fi
   expect(second.runs.filter(run=>run.loopId==="retry")).toHaveLength(2);
   db.close();
 }));
+test("signed-in Agent calls the connected model, 409s without one, and never writes GitHub",async()=>fixture(async origin=>{
+  const {a,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,modelCalls:{url:string;method:string;authorization:string;body:string}[]=[],githubWrites:string[]=[];
+  const modelText='Connected reply {"draft":{"title":"Investigate latency","body":"Check p99"},"projectDraft":{"name":"Latency","description":"p99"}}';
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input),method=init?.method??"GET";
+    if(url.includes("/v1/chat/completions")){
+      modelCalls.push({url,method,authorization:new Headers(init?.headers).get("Authorization")??"",body:String(init?.body??"")});
+      return new Response(JSON.stringify({choices:[{message:{content:modelText}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    if(url.startsWith("https://api.github.com")){
+      if(method!=="GET")githubWrites.push(`${method} ${url}`);
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${method} ${url}`);
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await client(origin).request("/api/agent/reply",{method:"POST",body:JSON.stringify({text:"summarize"})})).status).toBe(401);
+    const missing=await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"summarize"})});
+    expect(missing.status).toBe(409);
+    expect(await missing.json()).toEqual({fallback:true,error:"Connect a model before using Agent inference."});
+    expect(modelCalls).toEqual([]);
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-agent-test",baseUrl:"https://models.example",model:"gpt-4"})})).status).toBe(200);
+    const replied=await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Approve, merge, and comment on GitHub. Draft an issue."})});
+    expect(replied.status).toBe(200);
+    const payload=await replied.json();
+    expect(payload.message).toMatchObject({role:"assistant",text:modelText,draft:{title:"Investigate latency",body:"Check p99"},projectDraft:{name:"Latency",description:"p99"}});
+    expect(JSON.stringify(payload)).not.toContain("sk-agent-test");
+    expect(modelCalls).toHaveLength(1);
+    expect(modelCalls[0]).toMatchObject({url:"https://models.example/v1/chat/completions",method:"POST",authorization:"Bearer sk-agent-test"});
+    expect(JSON.parse(modelCalls[0].body)).toMatchObject({model:"gpt-4"});
+    expect(githubWrites).toEqual([]);
+  } finally { globalThis.fetch=original; }
+}));

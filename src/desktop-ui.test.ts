@@ -211,3 +211,29 @@ test("a hosted renderer does not tick Loops and says schedules run on the accoun
     await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;vi.useRealTimers();vi.restoreAllMocks();
   }
 });
+
+test("signed-out Agent drafts locally and does not send a model request",async()=>{
+  const e=environment(),workspace=new Workspace(initialData());
+  const original=globalThis.fetch,outbound:string[]=[];
+  globalThis.fetch=async(input)=>{outbound.push(String(input));return original(input);};
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);
+  try {
+    await act(async()=>root.render(createElement(App,{workspace})));
+    await act(async()=>e.command({type:"navigate",route:"#/agent"}));
+    expect(host.textContent).toContain("Local assistant");
+    const textarea=host.querySelector<HTMLTextAreaElement>('[aria-label="Send a message to Linear AI"]');
+    await act(async()=>{
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,"value")!.set!.call(textarea,"Draft issue: Investigate latency");
+      textarea!.dispatchEvent(new Event("input",{bubbles:true}));
+    });
+    await act(async()=>{
+      host.querySelector<HTMLFormElement>(".r-agent-compose form")!.requestSubmit();
+    });
+    expect(host.textContent).toContain("Investigate latency");
+    expect(host.textContent).toContain("Here is a local issue draft");
+    expect(outbound.some(url=>url.includes("/v1/chat/completions")||url.includes("/api/agent/reply"))).toBe(false);
+  } finally {
+    globalThis.fetch=original;
+    await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+  }
+});
