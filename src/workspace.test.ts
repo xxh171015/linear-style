@@ -309,6 +309,46 @@ describe("local adapters and automations", () => {
     expect(run.status).toBe("limited");
     expect(run.result).toContain("No message was sent");
   });
+  test("unconnected IndexedDB mode sends no outbound GitHub, model, or coding calls", async () => {
+    const original = globalThis.fetch;
+    const outbound: string[] = [];
+    globalThis.fetch = async (input, init) => {
+      outbound.push(String(input));
+      return original(input, init);
+    };
+    try {
+      const w = fresh();
+      w.mutate((d) => {
+        d.reviews = [
+          {
+            id: "review",
+            title: "Test",
+            author: "Ada",
+            approved: false,
+            status: "review",
+          },
+        ];
+        d.loops.push({
+          id: "code",
+          name: "Autofix",
+          prompt: "",
+          category: "Engineering",
+          trigger: "manual",
+          action: "coding-session",
+          enabled: true,
+        });
+      });
+      w.createIssue({ title: "offline coding" });
+      w.transitionReview("review", "approve");
+      const run = w.runLoop("code");
+      expect(run.status).toBe("limited");
+      expect(run.result).toContain("No session was started");
+      await localAgent.reply("Draft issue: stay local", w.getSnapshot());
+      expect(outbound).toEqual([]);
+    } finally {
+      globalThis.fetch = original;
+    }
+  });
   test("scheduled loops run once per interval while the app is active", () => {
     const w = fresh();
     w.mutate((d) =>
