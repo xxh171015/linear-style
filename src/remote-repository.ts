@@ -18,16 +18,59 @@ export function accountRequest(accountId:string,workspaceId?:string,request:type
   };
 }
 export class ServerError extends Error { status:number; constructor(status:number,message:string){super(message);this.status=status;} }
+const TOKEN_KEY="replica:account-token", ORIGIN_KEY="replica:account-origin", ENABLED_KEY="replica:account-enabled";
+export function accountApiBase() {
+  if(typeof window==="undefined" || !window.replicaDesktop) return "";
+  try { return (localStorage.getItem(ORIGIN_KEY) || "http://127.0.0.1:4175").replace(/\/$/,""); }
+  catch { return "http://127.0.0.1:4175"; }
+}
+export function setAccountApiBase(origin:string) {
+  try { localStorage.setItem(ORIGIN_KEY, origin.trim().replace(/\/$/,"")); } catch { /* Storage may be unavailable. */ }
+}
+export function accountEnabled() {
+  if(typeof window==="undefined") return false;
+  if(!window.replicaDesktop) return true;
+  try { return localStorage.getItem(ENABLED_KEY)==="1"; } catch { return false; }
+}
+export function setAccountEnabled(enabled:boolean) {
+  try { if(enabled) localStorage.setItem(ENABLED_KEY,"1"); else localStorage.removeItem(ENABLED_KEY); } catch { /* Storage may be unavailable. */ }
+}
+function accountToken() {
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+export function setAccountToken(token:string|null) {
+  try { if(token) localStorage.setItem(TOKEN_KEY,token); else localStorage.removeItem(TOKEN_KEY); } catch { /* Storage may be unavailable. */ }
+}
+function apiUrl(path:string) {
+  return path.startsWith("/") && accountApiBase() ? `${accountApiBase()}${path}` : path;
+}
 export async function serverRequest(path:string,init:RequestInit={},request:typeof fetch=fetch) {
-  const response=await request(path,{...init,credentials:"same-origin",headers:{"Content-Type":"application/json","X-Replica-Client":"1",...init.headers}});
+  const headers={"Content-Type":"application/json","X-Replica-Client":"1",...init.headers} as Record<string,string>;
+  const token=accountToken();
+  if(token) headers.Authorization=`Bearer ${token}`;
+  const response=await request(apiUrl(path),{...init,credentials:accountApiBase()?"omit":"same-origin",headers});
   let value;
   try{value=await response.json();}catch{throw new Error("The workspace server returned an invalid response.");}
   if(!response.ok)throw new ServerError(response.status,value.error??"The server request failed.");
+  if(typeof value?.token==="string" && /^[a-f0-9]{64}$/.test(value.token)) setAccountToken(value.token);
+  if(path.includes("/api/auth/logout")) setAccountToken(null);
   return value;
 }
 export async function discoverServer():Promise<AccountSession|null> {
-  const response=await fetch("/api/session",{credentials:"same-origin",cache:"no-store"});
-  if(!response.ok&&response.status!==404)throw Error("Unable to reach the workspace server. Retry to keep using your saved account.");
+  const headers:Record<string,string>={};
+  const token=accountToken();
+  if(token) headers.Authorization=`Bearer ${token}`;
+  let response:Response;
+  try {
+    response=await fetch(apiUrl("/api/session"),{credentials:accountApiBase()?"omit":"same-origin",cache:"no-store",headers});
+  } catch {
+    if(accountApiBase()) return null;
+    throw Error("Unable to reach the workspace server. Retry to keep using your saved account.");
+  }
+  if(!response.ok&&response.status!==404) {
+    if(accountApiBase()) return null;
+    throw Error("Unable to reach the workspace server. Retry to keep using your saved account.");
+  }
   if(response.status===404 || !response.headers.get("content-type")?.includes("application/json"))return null;
   if(!response.ok)throw Error("Unable to reach the workspace server. Retry to keep using your saved account.");
   const session=await response.json();
@@ -38,8 +81,8 @@ export class RemoteRepository implements Repository {
   private request:typeof fetch;
   private accountId?:string;
   private workspaceId?:string;
-  private identifiers:string[]=[];
-  private reservation?:Promise<void>;
+  private identifiers=new Map<string,string[]>();
+  private reservation=new Map<string,Promise<void>>();
   constructor(request:typeof fetch=fetch,accountId?:string,workspaceId?:string){
     this.accountId=accountId;
     this.workspaceId=workspaceId;
@@ -58,23 +101,30 @@ export class RemoteRepository implements Repository {
       return response;
     };
   }
-  private reserve() {
-    if(!this.reservation)this.reservation=(async()=>{
-      const range=await serverRequest("/api/issue-identifiers",{method:"POST"},this.request);
-      if(range.prefix!=="XXH"||!Number.isSafeInteger(range.start)||range.start<1||range.count!==16)throw Error("Invalid issue identifier reservation.");
-      this.identifiers.push(...Array.from({length:range.count},(_,i)=>`${range.prefix}-${range.start+i}`));
-    })().finally(()=>{this.reservation=undefined;});
-    return this.reservation;
+  private reserve(prefix="XXH") {
+    const pending=this.reservation.get(prefix);
+    if(pending)return pending;
+    const work=(async()=>{
+      const range=await serverRequest("/api/issue-identifiers",{method:"POST",body:JSON.stringify({prefix})},this.request);
+      if(range.prefix!==prefix||!Number.isSafeInteger(range.start)||range.start<1||range.count!==16)throw Error("Invalid issue identifier reservation.");
+      const queue=this.identifiers.get(prefix)??[];
+      queue.push(...Array.from({length:range.count},(_,i)=>`${range.prefix}-${range.start+i}`));
+      this.identifiers.set(prefix,queue);
+    })().finally(()=>{this.reservation.delete(prefix);});
+    this.reservation.set(prefix,work);
+    return work;
   }
-  nextIssueIdentifier() {
-    const id=this.identifiers.shift();
-    if(!id){void this.reserve().catch(()=>{});throw Error("Reconnect to reserve more issue identifiers, then retry creating the issue. Your draft is retained.");}
-    if(this.identifiers.length<4)void this.reserve().catch(()=>{});
+  nextIssueIdentifier(teamKey="XXH") {
+    const queue=this.identifiers.get(teamKey)??[];
+    const id=queue.shift();
+    this.identifiers.set(teamKey,queue);
+    if(!id){void this.reserve(teamKey).catch(()=>{});throw Error("Reconnect to reserve more issue identifiers, then retry creating the issue. Your draft is retained.");}
+    if(queue.length<4)void this.reserve(teamKey).catch(()=>{});
     return id;
   }
   async load():Promise<WorkspaceData> {
     const data=decodeWorkspace(await serverRequest("/api/workspace",{cache:"no-store"},this.request));
-    if(!this.identifiers.length)await this.reserve();return data;
+    if(![...this.identifiers.values()].some(queue=>queue.length))await this.reserve(data.settings.currentTeamKey || "XXH");return data;
   }
   async commit(data:WorkspaceData,base:WorkspaceData,preferLocal=false):Promise<WorkspaceData> {
     for(let attempt=0;attempt<8;attempt++) {
@@ -90,7 +140,7 @@ export class RemoteRepository implements Repository {
   watch(changed:()=>void) {
     if(typeof window==="undefined")return ()=>{};
     const refresh=()=>changed();
-    const events=typeof EventSource!=="undefined"?new EventSource(`/api/events?${new URLSearchParams({account:this.accountId??"",workspace:this.workspaceId??""})}`):undefined;
+    const events=!accountApiBase() && typeof EventSource!=="undefined"?new EventSource(`/api/events?${new URLSearchParams({account:this.accountId??"",workspace:this.workspaceId??""})}`):undefined;
     events?.addEventListener("message",refresh);
     events?.addEventListener("open",refresh);
     events?.addEventListener("error",refresh);

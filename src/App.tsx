@@ -43,6 +43,7 @@ import {
   InitiativesPage,
   LoopsPage,
   ProjectPages,
+  PulsePage,
   ReviewsPage,
   SettingsPage,
   ViewsPage,
@@ -51,6 +52,7 @@ import {
 import {
   DEFAULT_DISPLAY,
   Workspace,
+  currentTeam,
   displayIssues,
   matchesFilter,
   type WorkspaceData,
@@ -78,6 +80,7 @@ const NAV_LABEL: Record<NavId, string> = {
   settings: "Settings",
   archive: "Archive",
   documents: "Documents",
+  pulse: "Pulse",
 };
 const NAV_ICON: Record<NavId, () => ReactNode> = {
   inbox: () => <I.InboxIcon />,
@@ -95,6 +98,7 @@ const NAV_ICON: Record<NavId, () => ReactNode> = {
   settings: () => <I.SettingsIcon />,
   archive: () => <I.InboxIcon />,
   documents: () => <I.DocsIcon />,
+  pulse: () => <I.PulseIcon />,
 };
 export default function App({ workspace, initialSession }: { workspace: Workspace; initialSession?: unknown }) {
   return (
@@ -139,7 +143,8 @@ function Shell({initialSession}:{initialSession?:unknown}) {
     [recent, setRecent] = useState(false),
     [recentRoutes, setRecentRoutes] = useState<Route[]>([]),
     [tabs, setTabs] = useState(() => session),
-    [popover, setPopover] = useState<"filter" | "display" | "workspace-more" | null>(null),
+    [popover, setPopover] = useState<"filter" | "display" | "team" | null>(null),
+    [workspaceMore, setWorkspaceMore] = useState(false),
     [filter, setFilter] = useState<CustomViewFilter>({}),
     [toast, setToast] = useState(""),
     [syncReview, setSyncReview] = useState(false);
@@ -301,6 +306,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
     else timer=setInterval(()=>{if(document.hasFocus()&&workspace.saveState==="saved")workspace.tick();},60000);
     return () => { if(timer)clearInterval(timer); release?.(); controller.abort(); };
   }, [workspace]);
+  const team = currentTeam(data);
   let listed = data.issues;
   if (route.nav === "my-issues") {
     const tab = route.id ?? "assigned";
@@ -310,6 +316,8 @@ function Shell({initialSession}:{initialSession?:unknown}) {
       listed = listed.filter((i) => i.creator === data.settings.user);
     if (tab === "subscribed") listed = listed.filter((i) => i.subscribed);
   }
+  if (route.nav === "team-issues" || route.nav === "triage" || route.nav === "team-home")
+    listed = listed.filter((i) => (i.teamKey || team.key) === team.key);
   if (route.nav === "triage")
     listed = listed.filter(
       (i) =>
@@ -331,7 +339,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
     ? all.documents.find(doc=>doc.id===route.id)!.title
     : route.issueId
     ? `${route.issueId} ${all.issues.find((i) => i.id === route.issueId)?.title ?? ""}`
-    : route.nav==="settings"&&route.id==="members"?"Members":route.nav==="settings"&&route.id==="workspaces"?"Workspaces":NAV_LABEL[route.nav];
+    : route.nav==="settings"&&route.id==="members"?"Members":route.nav==="settings"&&route.id==="workspaces"?"Workspaces":route.nav==="settings"&&route.id==="teams"?"Teams":NAV_LABEL[route.nav];
   useEffect(() => { document.title = `${title} — Linear Replica`; }, [title]);
   const commands = useMemo(() => {
     const result: {
@@ -489,6 +497,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
             n: "initiatives",
             l: "loops",
             x: "archive",
+            f: "pulse",
           } as Record<string, NavId>
         )[lower];
         if (nav) {
@@ -568,6 +577,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
       nav === "triage"
         ? data.issues.filter(
             (i) =>
+              (i.teamKey || team.key) === team.key &&
               i.status === "triage" &&
               (!i.snoozedUntil || Date.parse(i.snoozedUntil) <= Date.now()),
           ).length
@@ -687,7 +697,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
             )}
           </div>
           <nav className="r-nav">
-            {(["inbox", "my-issues", "reviews", "agent"] as NavId[]).map(
+            {(["inbox", "my-issues", "reviews", "agent", "pulse"] as NavId[]).map(
               (nav) => navItem(nav),
             )}
             <details open className="r-nav-section">
@@ -695,23 +705,51 @@ function Shell({initialSession}:{initialSession?:unknown}) {
               {(["initiatives", "projects", "views", "loops"] as NavId[]).map(
                 (nav) => navItem(nav),
               )}
-              <button
-                className="r-nav-item"
-                onClick={() => setPopover(popover === "workspace-more" ? null : "workspace-more")}
+              <details
+                className="r-nav-more"
+                open={workspaceMore}
+                onToggle={(event) => setWorkspaceMore((event.currentTarget as HTMLDetailsElement).open)}
               >
-                <I.MoreIcon />
-                <span>More</span>
-              </button>
-              {popover === "workspace-more" && <div className="r-workspace-more">{(["documents","archive","settings"] as NavId[]).map(nav=>navItem(nav))}</div>}
+                <summary className="r-nav-item">
+                  <I.MoreIcon />
+                  <span>More</span>
+                </summary>
+                <div className="r-workspace-more">{(["documents","archive","settings"] as NavId[]).map(nav=>navItem(nav))}</div>
+              </details>
             </details>
             <details open className="r-nav-section">
               <summary>Your teams</summary>
-              <div className="r-team-name">
-                <span className="r-team-avatar">
-                  <I.HomeIcon />
-                </span>
-                Xxh
-                <I.ChevronDownIcon />
+              <div className="r-menu-anchor">
+                <button
+                  className="r-team-name"
+                  onClick={() => setPopover(popover === "team" ? null : "team")}
+                >
+                  <span className="r-team-avatar">
+                    <I.HomeIcon />
+                  </span>
+                  {team.name}
+                  <I.ChevronDownIcon />
+                </button>
+                {popover === "team" && (
+                  <div className="r-popover r-team-switcher">
+                    {data.teams.map((item) => (
+                      <button
+                        key={item.id}
+                        className={item.key === team.key ? "active" : ""}
+                        onClick={() => {
+                          workspace.setCurrentTeam(item.key);
+                          setPopover(null);
+                        }}
+                      >
+                        <span className="r-team-key">{item.key}</span>
+                        {item.name}
+                      </button>
+                    ))}
+                    <button onClick={() => { setPopover(null); navigate({ nav: "settings", id: "teams" }); }}>
+                      Manage teams
+                    </button>
+                  </div>
+                )}
               </div>
               {(
                 ["team-home", "triage", "team-issues", "cycles"] as NavId[]
@@ -729,12 +767,17 @@ function Shell({initialSession}:{initialSession?:unknown}) {
             {data.favorites.length > 0 && (
               <div className="r-nav-section">
                 <p>Favorites</p>
-                {data.favorites.map((id) => {
-                  const issue = data.issues.find((i) => i.id === id);
-                  return issue ? (
-                    <a key={id} className="r-nav-item" href={`#/issue/${id}`}>
+                {data.favorites.map((item) => {
+                  const issue = item.kind === "issue" ? data.issues.find((i) => i.id === item.targetId) : undefined;
+                  const project = item.kind === "project" ? data.projects.find((p) => p.id === item.targetId) : undefined;
+                  const view = item.kind === "view" ? data.views.find((v) => v.id === item.targetId) : undefined;
+                  const document = item.kind === "document" ? data.documents.find((doc) => doc.id === item.targetId && !doc.deletedAt) : undefined;
+                  const href = issue ? `#/issue/${issue.id}` : project ? `#/projects/${project.id}` : view ? `#/view/${view.id}` : document ? `#/documents/${document.id}` : "";
+                  const label = issue?.title ?? project?.name ?? view?.name ?? document?.title;
+                  return href && label ? (
+                    <a key={item.id} className="r-nav-item" href={href}>
                       <I.StarIcon />
-                      <span>{issue.title}</span>
+                      <span>{label}</span>
                     </a>
                   ) : null;
                 })}
@@ -920,6 +963,8 @@ function Shell({initialSession}:{initialSession?:unknown}) {
               <ArchivePage {...props} />
             ) : route.nav === "team-home" ? (
               <HomePage {...props} />
+            ) : route.nav === "pulse" ? (
+              <PulsePage onIssue={openIssue} />
             ) : (
               <SettingsPage section={route.id} invite={route.section==="invite"} />
             )}
@@ -1050,6 +1095,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
               ["Go to Triage", "G then T"],
               ["Go to Initiatives", "G then N"],
               ["Go to Loops", "G then L"],
+              ["Go to Pulse", "G then F"],
               ["Submit issue / comment", "⌘ Enter"],
             ].map(([label, key]) => (
               <div key={label}>

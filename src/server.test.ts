@@ -139,11 +139,11 @@ test("invited accounts jointly edit one workspace while retaining their own work
 test("members' drafts, inbox, chats, favorites, display preferences and private files never cross account boundaries",async()=>fixture(async origin=>{
   const {a,b,workspaceId}=await joinWorkspace(origin),ra=new RemoteRepository(a.request,undefined,workspaceId),rb=new RemoteRepository(b.request,undefined,workspaceId);
   const base=await ra.load(),wa=new Workspace(base),issue=wa.createIssue({title:"Shared issue"});
-  wa.mutate(d=>{d.draft.title="Alice private draft";d.chats.push({id:"alice-chat",title:"Private conversation",createdAt:new Date().toISOString(),messages:[]});d.favorites.push(issue.id);d.preferences.alice={...DEFAULT_DISPLAY,layout:"board"};d.settings.weekStartsOn=0;d.settings.desktopNotifications=true;for(const ownerId of ["draft","agent-draft","alice-chat",issue.id])d.attachments.push({id:ownerId,ownerId,name:"notes.txt",mime:"text/plain",size:6,blob:new Blob(["secret"])});});
+  wa.mutate(d=>{d.draft.title="Alice private draft";d.chats.push({id:"alice-chat",title:"Private conversation",createdAt:new Date().toISOString(),messages:[]});d.favorites.push({id:`issue:${issue.id}`,kind:"issue",targetId:issue.id});d.preferences.alice={...DEFAULT_DISPLAY,layout:"board"};d.settings.weekStartsOn=0;d.settings.desktopNotifications=true;for(const ownerId of ["draft","agent-draft","alice-chat",issue.id])d.attachments.push({id:ownerId,ownerId,name:"notes.txt",mime:"text/plain",size:6,blob:new Blob(["secret"])});});
   await ra.commit(wa.getSnapshot(),base);
   const bob=await rb.load();expect(bob.draft.title).toBe("");expect(bob.chats).toEqual([]);expect(bob.favorites).toEqual([]);expect(bob.inbox).toEqual([]);expect(bob.preferences.alice).toBeUndefined();expect(bob.settings.weekStartsOn).toBe(1);expect(bob.settings.desktopNotifications).toBeUndefined();expect(bob.attachments.map(item=>item.ownerId)).toEqual([issue.id]);
   const wb=new Workspace(bob);wb.updateIssue(issue.id,{priority:1});wb.mutate(d=>{d.draft.title="Bob private draft";});await rb.commit(wb.getSnapshot(),bob);
-  const alice=await ra.load();expect(alice.issues[0].priority).toBe(1);expect(alice.draft.title).toBe("Alice private draft");expect(alice.chats[0].title).toBe("Private conversation");expect(alice.favorites).toContain(issue.id);expect(alice.attachments).toHaveLength(4);expect(alice.settings.user).toBe("Alice");
+  const alice=await ra.load();expect(alice.issues[0].priority).toBe(1);expect(alice.draft.title).toBe("Alice private draft");expect(alice.chats[0].title).toBe("Private conversation");expect(alice.favorites.some(item=>item.targetId===issue.id)).toBe(true);expect(alice.attachments).toHaveLength(4);expect(alice.settings.user).toBe("Alice");
   expect((await rb.load()).draft.title).toBe("Bob private draft");
 }));
 test("only admins may invite, change roles, remove members or rename the shared workspace",async()=>fixture(async origin=>{
@@ -214,6 +214,23 @@ test("subscriptions and notification read state are personal and other members' 
   expect((await ra.load()).inbox.some(item=>item.id===notification!.id)).toBe(false);
   const before=await ra.load(),again=new Workspace(before);again.updateIssue(issue.id,{priority:2},"updated priority");await ra.commit(again.getSnapshot(),before);
   const after=await rb.load();expect(after.inbox.some(item=>item.text==="updated priority")).toBe(false);expect(after.inbox.find(item=>item.id===notification!.id)?.read).toBe(true);
+}));
+test("issue identifier reservations are per team prefix and desktop Bearer sessions work across replica origin",async()=>fixture(async origin=>{
+  const c=client(origin);const created=await (await c.register()).json();expect(typeof created.token).toBe("string");
+  const repo=new RemoteRepository(c.request),base=await repo.load(),w=new Workspace(base);
+  w.createTeam({key:"ENG",name:"Engineering"});
+  const first=w.createIssue({title:"Default team",teamKey:"XXH"});const second=w.createIssue({title:"Engineering",teamKey:"ENG"});
+  expect(first.id.startsWith("XXH-")).toBe(true);expect(second.id.startsWith("ENG-")).toBe(true);
+  await repo.commit(w.getSnapshot(),base);
+  const range=await (await c.request("/api/issue-identifiers",{method:"POST",body:JSON.stringify({prefix:"ENG"})})).json();
+  expect(range.prefix).toBe("ENG");expect(range.start).toBeGreaterThan(1);
+  const token=created.token as string;
+  const bearer=await fetch(`${origin}/api/session`,{headers:{Authorization:`Bearer ${token}`}});
+  expect((await bearer.json()).user.email).toBe("qa@example.test");
+  const preflight=await fetch(`${origin}/api/workspace`,{method:"OPTIONS",headers:{Origin:"replica://app","Access-Control-Request-Headers":"Authorization, Content-Type, X-Replica-Client"}});
+  expect(preflight.status).toBe(204);expect(preflight.headers.get("access-control-allow-origin")).toBe("replica://app");
+  const cross=await fetch(`${origin}/api/workspace`,{headers:{Authorization:`Bearer ${token}`,Origin:"replica://app","X-Replica-Client":"1"}});
+  expect(cross.status).toBe(200);expect(cross.headers.get("access-control-allow-origin")).toBe("replica://app");
 }));
 test("revision pushes reach a different member account in the selected workspace",async()=>fixture(async origin=>{
   const {a,b,workspaceId,memberId}=await joinWorkspace(origin),controller=new AbortController();

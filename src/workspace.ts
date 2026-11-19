@@ -19,11 +19,14 @@ import {
 } from "./kernel";
 import {
   CURRENT_USER,
+  DEFAULT_TEAM,
   TEAM_KEY,
+  labelColorFor,
   seedActivity,
   seedInbox,
   seedInitiatives,
   seedIssues,
+  seedLabels,
   seedMilestones,
   seedProjects,
   seedReviews,
@@ -37,11 +40,14 @@ import type {
   CustomViewFilter,
   Cycle,
   DisplayPreferences,
+  Favorite,
+  FavoriteKind,
   InboxItem,
   Initiative,
   Issue,
   IssueDraft,
   IssueCreationRelation,
+  IssueLabel,
   Loop,
   LoopRun,
   Project,
@@ -49,7 +55,86 @@ import type {
   ProjectMilestone,
   Review,
   StateCategory,
+  Team,
 } from "./types";
+export const TEAM_KEY_PATTERN = /^[A-Z][A-Z0-9]{1,7}$/;
+export function currentTeam(data: Pick<WorkspaceData, "teams" | "settings">): Team {
+  const teams = data.teams.length ? data.teams : [DEFAULT_TEAM];
+  return teams.find((team) => team.key === data.settings.currentTeamKey) ?? teams[0];
+}
+export function favoriteOf(data: Pick<WorkspaceData, "favorites">, kind: FavoriteKind, targetId: string) {
+  return data.favorites.find((item) => item.kind === kind && item.targetId === targetId);
+}
+export function labelColor(data: Pick<WorkspaceData, "labels">, name: string) {
+  return data.labels.find((label) => label.name === name)?.color ?? labelColorFor(name);
+}
+export type PulseEntry = {
+  id: string;
+  kind: "project" | "initiative" | "issue";
+  title: string;
+  body: string;
+  author: string;
+  time: string;
+  href: string;
+};
+export function pulseEntries(data: WorkspaceData): PulseEntry[] {
+  const items: PulseEntry[] = [];
+  for (const project of data.projects)
+    for (const update of project.updates)
+      items.push({
+        id: update.id,
+        kind: "project",
+        title: project.name,
+        body: update.body,
+        author: update.author,
+        time: update.time,
+        href: `#/projects/${encodeURIComponent(project.id)}`,
+      });
+  for (const initiative of data.initiatives)
+    for (const update of initiative.updates ?? [])
+      items.push({
+        id: update.id,
+        kind: "initiative",
+        title: initiative.name,
+        body: update.body,
+        author: update.author,
+        time: update.time,
+        href: `#/initiatives/${encodeURIComponent(initiative.id)}`,
+      });
+  for (const activity of data.activity)
+    items.push({
+      id: activity.id,
+      kind: "issue",
+      title: activity.issueId,
+      body: activity.text,
+      author: activity.author ?? "",
+      time: activity.time,
+      href: `#/issue/${encodeURIComponent(activity.issueId)}`,
+    });
+  return items.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+}
+function migrateFavorites(raw: unknown): Favorite[] {
+  if (!Array.isArray(raw)) return [];
+  const items: Favorite[] = [];
+  for (const item of raw) {
+    if (typeof item === "string" && item)
+      items.push({ id: `issue:${item}`, kind: "issue", targetId: item });
+    else if (
+      item &&
+      typeof item === "object" &&
+      typeof (item as Favorite).id === "string" &&
+      typeof (item as Favorite).targetId === "string" &&
+      ["issue", "project", "view", "document"].includes((item as Favorite).kind)
+    )
+      items.push({
+        id: (item as Favorite).id,
+        kind: (item as Favorite).kind,
+        targetId: (item as Favorite).targetId,
+      });
+    else throw Error("Saved favorites are invalid.");
+  }
+  return items;
+}
 
 export const CATEGORY: Record<Issue["status"], StateCategory> = {
   backlog: "backlog",
@@ -154,8 +239,10 @@ export type WorkspaceData = {
   preferences: Record<string, DisplayPreferences>;
   projectPreferences: Record<string, ProjectDisplay>;
   relations: Relation[];
-  favorites: string[];
-  settings: { workspace: string; user: string; weekStartsOn: number; desktopNotifications?:boolean };
+  teams: Team[];
+  labels: IssueLabel[];
+  favorites: Favorite[];
+  settings: { workspace: string; user: string; weekStartsOn: number; desktopNotifications?:boolean; currentTeamKey: string };
   revision: number;
 };
 export function initialData(): WorkspaceData {
@@ -175,6 +262,7 @@ export function initialData(): WorkspaceData {
       endDate: day(end),
       capacity: 8,
       description: "",
+      teamKey: TEAM_KEY,
     };
   });
   const issues = structuredClone(seedIssues).map((issue, i) => ({
@@ -222,8 +310,10 @@ export function initialData(): WorkspaceData {
     preferences: {},
     projectPreferences: {},
     relations: [],
+    teams: [{ ...DEFAULT_TEAM }],
+    labels: seedLabels.map((label) => ({ ...label })),
     favorites: [],
-    settings: { workspace: "xxh", user: CURRENT_USER, weekStartsOn: 1 },
+    settings: { workspace: "xxh", user: CURRENT_USER, weekStartsOn: 1, currentTeamKey: TEAM_KEY },
     revision: 0,
   };
 }
@@ -251,6 +341,52 @@ export function migrateData(input: unknown): WorkspaceData {
     ...structuredClone(raw),
     version: 2,
   } as WorkspaceData;
+  result.teams = Array.isArray(result.teams) && result.teams.length
+    ? result.teams.map((team) => {
+        if (!team || typeof team !== "object") throw Error("Saved teams are invalid.");
+        const id = String(team.id ?? "").trim();
+        const key = String(team.key ?? "").toUpperCase();
+        const name = String(team.name ?? "").trim();
+        if (!id || !TEAM_KEY_PATTERN.test(key) || !name) throw Error("Saved teams are invalid.");
+        return { id, key, name, createdAt: typeof team.createdAt === "string" ? team.createdAt : undefined };
+      })
+    : [{ ...DEFAULT_TEAM }];
+  if (!result.settings || typeof result.settings !== "object") result.settings = { ...defaults.settings };
+  const teamKeys = new Set(result.teams.map((team) => team.key));
+  if (teamKeys.size !== result.teams.length) throw Error("Saved teams contain a duplicate key.");
+  result.settings.currentTeamKey = TEAM_KEY_PATTERN.test(result.settings?.currentTeamKey ?? "") && teamKeys.has(result.settings.currentTeamKey)
+    ? result.settings.currentTeamKey
+    : result.teams[0].key;
+  result.labels = Array.isArray(result.labels)
+    ? result.labels.map((label) => {
+        if (!label || typeof label !== "object") throw Error("Saved labels are invalid.");
+        const id = String(label.id ?? "").trim();
+        const name = String(label.name ?? "").trim();
+        const color = String(label.color ?? "").trim() || labelColorFor(name);
+        const teamKey = String(label.teamKey ?? "").toUpperCase();
+        if (!id || !name) throw Error("Saved labels are invalid.");
+        if (teamKey && !TEAM_KEY_PATTERN.test(teamKey)) throw Error("Saved labels are invalid.");
+        return { id, name, color, teamKey: teamKey || undefined };
+      })
+    : [];
+  if (!result.labels.length) {
+    const names = [...new Set(result.issues.flatMap((issue) => issue.labels ?? []).filter((name) => typeof name === "string" && name))];
+    result.labels = names.map((name) => ({
+      id: `label-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "item"}`,
+      name,
+      color: labelColorFor(name),
+      teamKey: result.teams[0].key,
+    }));
+  }
+  result.favorites = migrateFavorites(result.favorites);
+  for (const issue of result.issues) {
+    const key = String(issue.teamKey ?? "").toUpperCase();
+    issue.teamKey = TEAM_KEY_PATTERN.test(key) ? key : result.teams[0].key;
+  }
+  for (const cycle of result.cycles) {
+    const key = String(cycle.teamKey ?? "").toUpperCase();
+    cycle.teamKey = TEAM_KEY_PATTERN.test(key) ? key : result.teams[0].key;
+  }
   for (const key of [
     "issues",
     "projects",
@@ -268,6 +404,8 @@ export function migrateData(input: unknown): WorkspaceData {
     "loops",
     "runs",
     "relations",
+    "teams",
+    "labels",
   ] as const) {
     if (!Array.isArray(result[key])) throw Error(`Saved ${key} are invalid.`);
     const ids = new Set<string>();
@@ -380,11 +518,7 @@ export function migrateData(input: unknown): WorkspaceData {
       Array.isArray(view.filter)
     )
       throw Error("A saved view is invalid.");
-  if (
-    !Array.isArray(result.favorites) ||
-    !result.favorites.every((id) => typeof id === "string")
-  )
-    throw Error("Saved favorites are invalid.");
+  if (!Array.isArray(result.favorites)) throw Error("Saved favorites are invalid.");
   if (!result.preferences || typeof result.preferences !== "object")
     throw Error("Saved display preferences are invalid.");
   for (const pref of Object.values(result.preferences))
@@ -545,7 +679,12 @@ export function matchesFilter(
     (!filter.query ||
       `${issue.id} ${issue.title} ${issue.body}`
         .toLowerCase()
-        .includes(filter.query.toLowerCase()))
+        .includes(filter.query.toLowerCase())) &&
+    (!filter.teamKey || (issue.teamKey || TEAM_KEY) === filter.teamKey) &&
+    (filter.due !== "set" || !!issue.dueDate) &&
+    (filter.due !== "unset" || !issue.dueDate) &&
+    (filter.estimate !== "set" || issue.estimate != null) &&
+    (filter.estimate !== "unset" || issue.estimate == null)
   );
 }
 export function displayIssues(
@@ -612,7 +751,7 @@ export function matchesProjectFilter(
   );
 }
 export interface Repository {
-  nextIssueIdentifier?(): string;
+  nextIssueIdentifier?(teamKey?: string): string;
   load(): Promise<unknown | undefined>;
   save(data: WorkspaceData): Promise<void>;
   commit?(data: WorkspaceData, base: WorkspaceData, preferLocal?: boolean): Promise<WorkspaceData>;
@@ -775,7 +914,7 @@ export class Workspace {
       this.activeSnapshot = { ...this.data, issues,
         inbox: this.data.inbox.filter(item => !deletedIds.has(item.issueId)),
         activity: this.data.activity.filter(item => !deletedIds.has(item.issueId)),
-        favorites: this.data.favorites.filter(id => !this.data.issues.some(issue => issue.id === id && issue.deletedAt)),
+        favorites: this.data.favorites.filter(item => item.kind !== "issue" || !this.data.issues.some(issue => issue.id === item.targetId && issue.deletedAt)),
         relations: this.data.relations.filter(r => r.scope !== "issue" || (ids.has(r.sourceId) && ids.has(r.targetId))),
       };
       this.activeSource = this.data;
@@ -991,13 +1130,15 @@ export class Workspace {
           ancestor = d.issues.find(issue => issue.id === ancestor)?.parentId;
         }
       }
+      const issueTeam = input.teamKey || currentTeam(d).key;
       const kernel = createKernel({
         viewer: d.settings.user,
-        teamKey: TEAM_KEY,
+        teamKey: issueTeam,
         ...d,
       });
       created = kernel.createIssue({
         ...input,
+        teamKey: issueTeam,
         parentId: context?.mode === "parent" ? context.issueId : input.parentId,
         labels: [
           ...new Set(
@@ -1007,10 +1148,13 @@ export class Workspace {
         date: formatDate(stamp()),
       });
       if(this.repository?.nextIssueIdentifier) {
-        let reserved=this.repository.nextIssueIdentifier();
-        while(d.issues.some(issue=>issue.id===reserved))reserved=this.repository.nextIssueIdentifier();
+        let reserved=this.repository.nextIssueIdentifier(issueTeam);
+        while(d.issues.some(issue=>issue.id===reserved))reserved=this.repository.nextIssueIdentifier(issueTeam);
         created.id=reserved;
       }
+      for (const name of created.labels)
+        if (!d.labels.some((label) => label.name === name))
+          d.labels.push({ id: uid("label"), name, color: labelColorFor(name), teamKey: issueTeam });
       created.createdAt = stamp();
       created.updatedAt = stamp();
       if (input.cycleId) created.cycleId = input.cycleId;
@@ -1061,6 +1205,7 @@ export class Workspace {
         title: `${source.title} (copy)`, body: source.body, status: source.status,
         priority: source.priority, assignee: source.assignee, labels: [...source.labels],
         projectId: source.projectId, milestoneId: source.milestoneId, cycleId: source.cycleId,
+        teamKey: source.teamKey, estimate: source.estimate, dueDate: source.dueDate,
       };
     });
   }
@@ -1321,11 +1466,50 @@ export class Workspace {
       const index = d.cycles.findIndex((c) => c.id === input.id);
       const cycle = {
         ...input,
+        teamKey: input.teamKey || currentTeam(d).key,
         number:
           input.number ?? Math.max(0, ...d.cycles.map((c) => c.number)) + 1,
       };
       if (index < 0) d.cycles.push(cycle);
       else d.cycles[index] = cycle;
+    });
+  }
+  createTeam(input: { key: string; name: string }) {
+    const key = input.key.trim().toUpperCase();
+    const name = input.name.trim();
+    if (!TEAM_KEY_PATTERN.test(key)) throw Error("Team key must be 2–8 letters or numbers, starting with a letter.");
+    if (!name) throw Error("A team name is required.");
+    this.mutate((d) => {
+      if (d.teams.some((team) => team.key === key)) throw Error("A team with this key already exists.");
+      d.teams.push({ id: uid("team"), key, name, createdAt: stamp() });
+      d.settings.currentTeamKey = key;
+    });
+  }
+  setCurrentTeam(key: string) {
+    const teamKey = key.trim().toUpperCase();
+    this.mutate((d) => {
+      if (!d.teams.some((team) => team.key === teamKey)) throw Error("Team not found.");
+      d.settings.currentTeamKey = teamKey;
+    });
+  }
+  saveLabel(input: { name: string; color?: string; teamKey?: string }) {
+    const name = input.name.trim();
+    if (!name) throw Error("A label name is required.");
+    const color = input.color && /^#[0-9a-fA-F]{6}$/.test(input.color) ? input.color : labelColorFor(name);
+    this.mutate((d) => {
+      const teamKey = input.teamKey || currentTeam(d).key;
+      const existing = d.labels.find((label) => label.name === name && (label.teamKey || teamKey) === teamKey);
+      if (existing) existing.color = color;
+      else d.labels.push({ id: uid("label"), name, color, teamKey });
+    });
+  }
+  toggleFavorite(kind: FavoriteKind, targetId: string) {
+    if (!targetId) throw Error("Choose something to favorite.");
+    this.mutate((d) => {
+      const existing = favoriteOf(d, kind, targetId);
+      d.favorites = existing
+        ? d.favorites.filter((item) => item.id !== existing.id)
+        : [...d.favorites, { id: `${kind}:${targetId}`, kind, targetId }];
     });
   }
   runLoop(id: string, onlyIssueId?: string): LoopRun {

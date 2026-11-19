@@ -1,0 +1,40 @@
+{
+  "evidence_id": "ev_a23b54e95b06f15f42d4b79fdc99a060c8cd30f8f462cf07ee4c83ea8d5eb67b",
+  "window": {
+    "pid": 24969,
+    "window_id": 19638,
+    "executable": "/Applications/Linear.app/Contents/MacOS/Linear",
+    "launch_time": 1794910674.772564,
+    "title": "Reviews"
+  },
+  "truncated": false,
+  "gaps": [],
+  "labels": [
+    "Reviews",
+    "Reviews",
+    "Reviews",
+    "Reviews",
+    "Inbox",
+    "My issues",
+    "Reviews 5 pull requests",
+    "Agent",
+    "Workspace",
+    "Initiatives",
+    "Projects",
+    "Views",
+    "Loops",
+    "Your teams",
+    "Xxh Team menu Home Triage 3 issues to triage Issues Cycles Current Upcoming Projects Views",
+    "Xxh",
+    "Try",
+    "Dismiss",
+    "Dismiss",
+    "Reviews",
+    "Created 5",
+    "To review",
+    "Ready to merge 5",
+    "Ready to merge 5",
+    "Merged 32",
+    "Merged 32"
+  ]
+}

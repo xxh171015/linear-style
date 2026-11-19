@@ -10,7 +10,7 @@ import App from "./App";
 import { AccountGate, AccountContext } from "./account-ui";
 import { Dialog } from "./ui";
 import { WorkspaceAccounts } from "./workspace-members-ui";
-import { accountRequest, discoverServer, RemoteRepository, serverRequest, type AccountSession, type MembershipSummary, type WorkspaceMember } from "./remote-repository";
+import { accountEnabled, accountRequest, discoverServer, RemoteRepository, serverRequest, type AccountSession, type MembershipSummary, type WorkspaceMember } from "./remote-repository";
 import {
   IndexedDBRepository,
   Workspace,
@@ -63,7 +63,7 @@ function Bootstrap() {
     setError("");setAccessEmpty(false);
     let loadedWorkspace: Workspace | undefined;
     void (async()=>{
-        const account=window.replicaDesktop?null:await discoverServer();
+        const account=accountEnabled()?await discoverServer():null;
         if(!active)return;
         setAccount(account);
         if(account&&!account.user){setWorkspace(null);return;}

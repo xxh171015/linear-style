@@ -29,7 +29,7 @@ export function deepLinkRoute(value) {
     if (url.protocol !== 'linear-replica:' || url.username || url.password || url.port || url.search) return null;
     const parts = [url.hostname, ...url.pathname.split('/').filter(Boolean)].map(decodeURIComponent);
     if (parts[0] === 'issue' && parts.length === 2 && /^[A-Za-z][A-Za-z0-9_]*-\d+$/.test(parts[1])) return `#/issue/${encodeURIComponent(parts[1])}`;
-    const pages = ['inbox','my-issues','projects','initiatives','views','cycles','triage','archive','reviews','agent','loops','settings','documents'];
+    const pages = ['inbox','my-issues','projects','initiatives','views','cycles','triage','archive','reviews','agent','loops','settings','documents','pulse'];
     return parts.length === 1 && pages.includes(parts[0]) ? `#/${parts[0]}` : null;
   } catch { return null; }
 }

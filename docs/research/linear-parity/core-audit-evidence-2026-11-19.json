@@ -1,0 +1,2980 @@
+{
+  "date": "2026-11-19",
+  "target": "/Applications/Linear.app",
+  "scope": "Read-only native UI; exact ASAR source selection; repository source review. No original workspace writes.",
+  "baseline_commit": "fa1cb7e131be67988d11dae134b26c01181d7657",
+  "test_result": {
+    "command": "./node_modules/.bin/vitest run",
+    "files_passed": 18,
+    "tests_passed": 222,
+    "duration_seconds": 1.82
+  },
+  "existing_dirty_files": [
+    "index.html",
+    "package.json"
+  ],
+  "evidence": [
+    {
+      "evidence_id": "ev_5295709224b7f62b64d9e48f5e1f3c9b2fe77d5382fe7d6ce6a1da3358ade101",
+      "operation": "inspect_desktop_application",
+      "parameters": {
+        "path": "/Applications/Linear.app",
+        "max_entries": 20000,
+        "max_probe_bytes": 8388608
+      },
+      "limitations": [
+        "Runtime candidates and component markers do not establish loaded code, execution, or build correspondence.",
+        "The directory SHA-256 commits only to retained paths, omission kinds, available filesystem metadata and read-range digests, not to every file's contents. Unread bytes are unknown.",
+        "Special-entry payloads are not read. Their paths and kinds are retained; other special-entry metadata is unavailable in this report.",
+        "Child symlinks are not followed. Executable section-embedded PCKs without a trailer and encrypted contents remain unexamined.",
+        "This is a sequence of stable entry observations, not an atomic snapshot of the entire directory.",
+        "Unity reference decoding stops after a witness in each Data/Managed directory; other assemblies' references are unexamined. Header facts remain per-file."
+      ],
+      "relationship_coverage": null,
+      "complete_evidence": "artifacts/rea-core-desktop-2026-11-19.json"
+    },
+    {
+      "evidence_id": "ev_be12eda38921af84eee12abed16023db70a3702988ad14a84e19d53eb6852270",
+      "operation": "analyze_javascript_application",
+      "parameters": {
+        "input_path": "/Applications/Linear.app/Contents/Resources/app.asar",
+        "format": "auto",
+        "integrity_policy": "record-and-continue",
+        "source_paths": [
+          "package.json",
+          "out/preload/index.js",
+          "out/preload/review-preview.js"
+        ]
+      },
+      "limitations": [
+        "3 integrity contradiction(s) were recorded; mismatched content is observed-untrusted.",
+        "Alias selection expansion was conservatively bounded (maximum 512 additional selector states); selected paths remain unknown.",
+        "Artifact integrity metadata contradicts observed bytes at node_modules/@linear/desktop-force-press/build/Release/force_press.node; the observed bytes are untrusted.",
+        "Artifact integrity metadata contradicts observed bytes at node_modules/@linear/desktop-haptics/build/Release/haptics.node; the observed bytes are untrusted.",
+        "Artifact integrity metadata contradicts observed bytes at node_modules/@linear/desktop-swipe-navigation/build/Release/swipe_navigation.node; the observed bytes are untrusted.",
+        "Caller-selected source analysis leaves 11 inventoried files outside analysis scope. Inventory identity covers the complete artifact; relationships through unselected sources remain unknown.",
+        "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+        "Dynamic IPC channel expressions remain unresolved and are never paired by textual similarity.",
+        "Electron API identity follows proven lexical module aliases and structurally verified module-namespace interop. Other reassignments, dynamic selections, and visibly overwritten namespace members are unresolved; missing findings do not establish absence. Arbitrary call side effects and runtime registration are not evaluated.",
+        "Electron relationships are derived from inert syntax; runtime registration, reachability, defaults, and enforcement remain unproven.",
+        "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+        "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+        "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+        "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+        "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code."
+      ],
+      "relationship_coverage": null,
+      "complete_evidence": "artifacts/rea-core-preload-2026-11-19.json",
+      "root_artifact_sha256": "5f13f9e9784b1c5a13b761ec50657879408084e8f8ee91fbfb3c6b1aa80b0dd8",
+      "source_selection": {
+        "requested_paths": [
+          "package.json",
+          "out/preload/index.js",
+          "out/preload/review-preview.js"
+        ],
+        "unselected_files": 11
+      },
+      "statistics": {
+        "relevant_files": 14,
+        "nested_asar_containers": 0,
+        "text_bytes_read": 105617,
+        "invalid_utf8_files": 0,
+        "parsed_javascript_files": 2,
+        "skipped_javascript_files": 0,
+        "visited_ast_nodes": 32813,
+        "findings": 129,
+        "modules": 0,
+        "parse_failures": 0
+      },
+      "summary": {
+        "browser_windows": 0,
+        "explicit_web_preferences": 0,
+        "preload_entrypoints": 0,
+        "context_bridge_apis": 2,
+        "exposed_api_members": 0,
+        "ipc": {
+          "operations": 102,
+          "literal_channels": 0,
+          "dynamic_channel_operations": 102,
+          "renderer_transmissions": 66,
+          "renderer_listeners": 36,
+          "main_handlers": 0,
+          "paired_renderer_transmissions": 0,
+          "ambiguous_renderer_transmissions": 0,
+          "unpaired_literal_renderer_transmissions": 0
+        },
+        "sender_validation_observations": 0,
+        "utility_processes": 0,
+        "resolved_utility_entrypoints": 0,
+        "native_addon_bindings": 0,
+        "resolved_native_addon_bindings": 0
+      },
+      "integrity_contradictions": [
+        {
+          "contradiction_id": "ic_ce938929420ee6b18f8a6f274826b8266e60ff781c36086744e06856409ed03d",
+          "occurrence_id": "occ_b97b474a39b1bb50360139594daa112e76db4879737240e2a7153cd6cc04329f",
+          "parent_artifact_id": "art_79caa35809cc28dd653cd8e6ee4941adc87886a89025f4c73755c78e89df8626",
+          "logical_path": "node_modules/@linear/desktop-force-press/build/Release/force_press.node",
+          "entry_kind": "file",
+          "unpacked": true,
+          "trust": "observed-untrusted",
+          "provenance": "container-integrity-metadata-versus-observed-bytes",
+          "limitations": [
+            "Observed bytes contradict declared integrity metadata and cannot support equivalence."
+          ],
+          "declared_sha256": "970cb796246f28317fea8e66227ee9f5dc674b2c409bf2e16cbb83e5e59beb5f",
+          "observed_sha256": "dba5a0f26d85d0a949f8e1228ce06370648b91cf70422d48ab709a5fe0e0b6e1"
+        },
+        {
+          "contradiction_id": "ic_53ced63fbaa4458b4da71ead3971ccb60c965e202c02754e1549f388edc81a14",
+          "occurrence_id": "occ_ab34515cfae334eb044dda50ee18aa0b0038bc86fa0615b05ac4a12a26766082",
+          "parent_artifact_id": "art_a181ecc983a8f38e72d70098e6dbeca8e421447f4e85b96647a18e5e4b0b5574",
+          "logical_path": "node_modules/@linear/desktop-haptics/build/Release/haptics.node",
+          "entry_kind": "file",
+          "unpacked": true,
+          "trust": "observed-untrusted",
+          "provenance": "container-integrity-metadata-versus-observed-bytes",
+          "limitations": [
+            "Observed bytes contradict declared integrity metadata and cannot support equivalence."
+          ],
+          "declared_sha256": "136f0a70094620ea5039a66e412510e722ddc422e9d77039010571492bd008b2",
+          "observed_sha256": "1baa16f54a0931d24f71979ceb0cc9571340220da5b89ce68446d64cb7ce9c4a"
+        },
+        {
+          "contradiction_id": "ic_eec0a6fbbac5fe9446dd4590d61dc4143b12814e0281e3219260954706ca0c10",
+          "occurrence_id": "occ_05c6968c44369f2f47b7d9fbdbfb00a1179ed4a95474382befd12dcbf15a3d37",
+          "parent_artifact_id": "art_a6e40a53747b99a1e494b3ba8460a8e4e47309a8de2469b9ae5c485b180c17ea",
+          "logical_path": "node_modules/@linear/desktop-swipe-navigation/build/Release/swipe_navigation.node",
+          "entry_kind": "file",
+          "unpacked": true,
+          "trust": "observed-untrusted",
+          "provenance": "container-integrity-metadata-versus-observed-bytes",
+          "limitations": [
+            "Observed bytes contradict declared integrity metadata and cannot support equivalence."
+          ],
+          "declared_sha256": "2b65d80265884f7fffca52465e7fc4812f96fd038502ad4f6580abb1bef56589",
+          "observed_sha256": "0e1b29cf9130f651093f6a5c8e624c30f25b5f13bc7807c153156f485c266a74"
+        }
+      ],
+      "ipc_observations": [
+        {
+          "node_id": "jag_node_0009dad726ad1733407bc4b8f5ad6005818330e7a028aab7dbbaa61f915454e4",
+          "label": "n.systemSuspend",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.systemSuspend",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15339
+              },
+              "end": {
+                "line": 1,
+                "column": 15431
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_0350d7ec50adba05fcbb5178a8696806428af0f3c37458595221849af5c25c16",
+          "label": "n.clientAlwaysShowTabBarChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientAlwaysShowTabBarChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10291
+              },
+              "end": {
+                "line": 1,
+                "column": 10345
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_046fc162579aae89bb237c369c60c5ae67813d9178e2ad5d14933cc110cf0e4d",
+          "label": "n.nativeThemeChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.nativeThemeChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8451
+              },
+              "end": {
+                "line": 1,
+                "column": 8501
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_08f1e3a1f734ecd27622c6551f5dac6c21683cc5843f063e7ceadd292d27b94d",
+          "label": "n.commandMenuReady",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.commandMenuReady",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12148
+              },
+              "end": {
+                "line": 1,
+                "column": 12190
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_09bcffad906c5d381c8180aa110aa901af8446e7927a813cb4b88c1efc19d7c0",
+          "label": "n.openCommandMenu",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.openCommandMenu",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11773
+              },
+              "end": {
+                "line": 1,
+                "column": 11810
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_09fd60c01a9ceff8412b520f427cb04333d1cfcb121f8ce75a926237483438d7",
+          "label": "n.getCommandMenuSettings",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.getCommandMenuSettings",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12388
+              },
+              "end": {
+                "line": 1,
+                "column": 12434
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_11a0fac46569d5c0f201ca79f2ed6904707b351ad9d468254c356a908d511d70",
+          "label": "n.checkUrl",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.checkUrl",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15788
+              },
+              "end": {
+                "line": 1,
+                "column": 15912
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_11c6c3c83da86a18df72ac1c85b8d9e67115a9c4b3400a8801158988cf09852e",
+          "label": "n.updateTrafficLightPosition",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.updateTrafficLightPosition",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9562
+              },
+              "end": {
+                "line": 1,
+                "column": 9612
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_14ef83ecb504efb12196cc1dce2b15951a34d29e9473c74a0f56faf9717fcd1e",
+          "label": "n.clientReload",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientReload",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14572
+              },
+              "end": {
+                "line": 1,
+                "column": 14606
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_19afd527bb56867fe74d2306e0f85b764773ac2eba3572a0d6a1de273efe9f6a",
+          "label": "n.showFileInFolder",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.showFileInFolder",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14839
+              },
+              "end": {
+                "line": 1,
+                "column": 14881
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_1a022652369ffab8a47af699cf1e1ae8ae55f46cadd8526bf5237c2f768cb92b",
+          "label": "n.confirm",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.confirm",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10085
+              },
+              "end": {
+                "line": 1,
+                "column": 10118
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_1cd04ae9358bf06d5739c8bc13403dcc202aa261f4fa48fed7fbbf5d51418c94",
+          "label": "n.reloadRequested",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.reloadRequested",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14451
+              },
+              "end": {
+                "line": 1,
+                "column": 14553
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_20ba9099ecb7431f04aa40fa0c6bfd7ec843ed7948ffa40218f588c73164e7e7",
+          "label": "n.swipeNavigationEnabledChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.swipeNavigationEnabledChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13787
+              },
+              "end": {
+                "line": 1,
+                "column": 13840
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_23ef5090ac16f830ecaf2ddd112dcfeadf2878f25730f52473ecccaf8975f895",
+          "label": "n.downloadUrl",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.downloadUrl",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10440
+              },
+              "end": {
+                "line": 1,
+                "column": 10482
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_269801d775cb8d234b33f5905f20319ce1795cf88b828135f9417de85a7b3516",
+          "label": "n.setCommandMenuSettings",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.setCommandMenuSettings",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12461
+              },
+              "end": {
+                "line": 1,
+                "column": 12509
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_2866ccd0f12f4a901ca7b1c5272e117a8a78854b8331c9a9da67cc40093a1534",
+          "label": "n.selectFolderOrFile",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.selectFolderOrFile",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15196
+              },
+              "end": {
+                "line": 1,
+                "column": 15240
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_2b2ea6c73edad8aa42a3a1d5c12d38b679cd92a0586dc1701186a8d544e75de9",
+          "label": "n.desktopCreateActionAvailabilityChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.desktopCreateActionAvailabilityChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11537
+              },
+              "end": {
+                "line": 1,
+                "column": 11598
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_2cb6e02606e092fdfd225514e5cb53fca6723ef66d727c4ea685b5e6bbc351f1",
+          "label": "n.closeTabRequested",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.closeTabRequested",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13306
+              },
+              "end": {
+                "line": 1,
+                "column": 13351
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_303143a70d202e537c4c4ad918da0a5db4028650af5b622776ad598d8b77914b",
+          "label": "n.getKnownWindowIds",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.getKnownWindowIds",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9919
+              },
+              "end": {
+                "line": 1,
+                "column": 9960
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_30eb326921fb9371969d48f3fc84259902c6ed16cef4993f78c10dcc27c37ba0",
+          "label": "n.leaveFullScreen",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.leaveFullScreen",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13044
+              },
+              "end": {
+                "line": 1,
+                "column": 13087
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_313ab733c7c3070f6836e27eb05271b909e2ed91199a18ed6e55de87a8a19a11",
+          "label": "n.setHardwareAccelerationDisabled",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.setHardwareAccelerationDisabled",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10009
+              },
+              "end": {
+                "line": 1,
+                "column": 10066
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_3384ec27201d18df847427d8381df50baa1be1502571a7267a6c8237458fee43",
+          "label": "n.openNotificationSettings",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.openNotificationSettings",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14958
+              },
+              "end": {
+                "line": 1,
+                "column": 15006
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_33fcc3a2f1f99450fb5ac0bce30307d8616f6929877c999e24af04353432db0f",
+          "label": "n.openNewWindow",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.openNewWindow",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10911
+              },
+              "end": {
+                "line": 1,
+                "column": 10950
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_34a2854613ffa55f87c05fe44fa5f125a68d0bbfd9157258d54f84886e243feb",
+          "label": "n.commandMenuClosed",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.commandMenuClosed",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12027
+              },
+              "end": {
+                "line": 1,
+                "column": 12066
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_35805f4456c5bc19fea6238abfca5604bd21d9511924875a67759eda0a9add23",
+          "label": "n.forcePress",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.forcePress",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13933
+              },
+              "end": {
+                "line": 1,
+                "column": 13965
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_36b782281d07c859fb6cc4da0499d52069ab1840231b099667775218b95e7731",
+          "label": "n.clientBootstrapComplete",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientBootstrapComplete",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10718
+              },
+              "end": {
+                "line": 1,
+                "column": 10763
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_39fd988777c4fae591defb9d51be9cb84df0eca751008f20cad6f954179a8aee",
+          "label": "n.newIssue",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.newIssue",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11319
+              },
+              "end": {
+                "line": 1,
+                "column": 11355
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_3ab065dac3e5db6d7095f024052fe02c807c978d30d5090a5b59f6d32498cb74",
+          "label": "n.swipeNavigationEnabledChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.swipeNavigationEnabledChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13681
+              },
+              "end": {
+                "line": 1,
+                "column": 13734
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_3ba154253ba9a86f575f79e3e764bcff706e577d754a67b3d6be2d44b4d56001",
+          "label": "n.commandMenuFinished",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.commandMenuFinished",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12216
+              },
+              "end": {
+                "line": 1,
+                "column": 12261
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_4888e24d657d38164179d8ebccdfa6ad72e442cb1a3a49367e57d9462c857466",
+          "label": "n.setFullScreen",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.setFullScreen",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12831
+              },
+              "end": {
+                "line": 1,
+                "column": 12868
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_5270ac6d8be5a70ef2cd601c7a618cbb31ea475d9ef2829d2c75620ebe7a59f5",
+          "label": "n.flareUpload",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.flareUpload",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7811
+              },
+              "end": {
+                "line": 1,
+                "column": 7852
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_530ed1e70978eae78fc83892eac2048f6d58e7c9fc7cf1b5c87ecb592a1e351f",
+          "label": "n.quitRequestReceived",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.quitRequestReceived",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13178
+              },
+              "end": {
+                "line": 1,
+                "column": 13219
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_58aa2d1c96e58201e25a45c104bac36f183c603840e2e9dcdb406ec84959cdc3",
+          "label": "n.desktopCreateAction",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.desktopCreateAction",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11440
+              },
+              "end": {
+                "line": 1,
+                "column": 11493
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_5aae9ab1662e3b60ad923eaf500774045c36d1a6082dcc886c567fe5f2661734",
+          "label": "n.clientPushMessage",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientPushMessage",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10505
+              },
+              "end": {
+                "line": 1,
+                "column": 10546
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_5bec5b3cbff7a9f6a517709ca59bcf91607b8db96a7f9c5aa64a54de8f593555",
+          "label": "n.desktopRedirect",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.desktopRedirect",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11170
+              },
+              "end": {
+                "line": 1,
+                "column": 11223
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_5c1445c86301b3b4695300142bee3c5588ce67cc8aa61a5eb5cbbcb4b441ccb2",
+          "label": "n.swipeGesture",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.swipeGesture",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13646
+              },
+              "end": {
+                "line": 1,
+                "column": 13680
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_5d7ce17beaa8a4f8c6b7d6a5065080fb8d1370bb2040d86661c404b4783c2689",
+          "label": "n.flareRetryCompression",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.flareRetryCompression",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7745
+              },
+              "end": {
+                "line": 1,
+                "column": 7794
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_61001733dcf3b419f3e2f4d6403ba09b9dc469674bd4f77ed176c6fa8a3a92ab",
+          "label": "n.downloadUrl",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.downloadUrl",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10371
+              },
+              "end": {
+                "line": 1,
+                "column": 10413
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_64800b1ad0cb05ac48f93ac4225aced2f69026d65ba6da52cdaf67194bb667a2",
+          "label": "n.closeWindowRequestReceived",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.closeWindowRequestReceived",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14297
+              },
+              "end": {
+                "line": 1,
+                "column": 14345
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_667f3e8a94de5659e45550db47a23e8fac9087c9d98e1535736c9a4237d1c579",
+          "label": "n.clientThemeChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientThemeChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10644
+              },
+              "end": {
+                "line": 1,
+                "column": 10687
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_67942a10c754d6d70ba8832bd9fa40f35e035eb79c6c34165175671b886cf3f8",
+          "label": "n.flareStateChanged",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.flareStateChanged",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8100
+              },
+              "end": {
+                "line": 1,
+                "column": 8139
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_6b71d58ef46a788966405beab270599de1538d8e13a941492858c51a427b84d7",
+          "label": "n.checkFlagOrConfig",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.checkFlagOrConfig",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10789
+              },
+              "end": {
+                "line": 1,
+                "column": 10887
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_6c8e5cd7668d299e698f013b975078cd36a8cd66e1a240e40c8f7fd289ad59f1",
+          "label": "n.tabGoForward",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.tabGoForward",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13512
+              },
+              "end": {
+                "line": 1,
+                "column": 13552
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_704475415d4020bd503ddf93ae96c829ca49561576d19f535e391d4af13861cd",
+          "label": "n.checkUrlResponse",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.checkUrlResponse",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15854
+              },
+              "end": {
+                "line": 1,
+                "column": 15910
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_70800fb6b33ac4473fb2346a46e9dd07e0d1157f743abebe26d839655769b57f",
+          "label": "n.closeWindowRequested",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.closeWindowRequested",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14252
+              },
+              "end": {
+                "line": 1,
+                "column": 14369
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_71d954dc96732a1cfaa252d1c2f51e7675af0a8133a7ff47889f487e1d50fe2e",
+          "label": "n.reloadRequestReceived",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.reloadRequestReceived",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14491
+              },
+              "end": {
+                "line": 1,
+                "column": 14534
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_72d94e12c27e8e861994c7b4c42ae2677d28dbbd4184c58ecbb4098713da3af4",
+          "label": "n.titlebarDoubleClick",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.titlebarDoubleClick",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10575
+              },
+              "end": {
+                "line": 1,
+                "column": 10616
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_72d966acaebecb48c0e3b7db2484b2013ae4836b485983c08d95281840551112",
+          "label": "n.getHardwareAccelerationDisabled",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.getHardwareAccelerationDisabled",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9836
+              },
+              "end": {
+                "line": 1,
+                "column": 9891
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_74791a0802d1441838640902fa34ecaaacff18cae9b9487d5e70c767e1e9d7d3",
+          "label": "n.flareState",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.flareState",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7684
+              },
+              "end": {
+                "line": 1,
+                "column": 7720
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_7847476bab3e5843364953bd117523ea0957919a8ccac17c785cb019ff499f2e",
+          "label": "n.forcePressEnabledChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.forcePressEnabledChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13966
+              },
+              "end": {
+                "line": 1,
+                "column": 14014
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_78d25ef99215c8743524c161b2b9945f3ea1923d2e8f52c7fecbf14433177a29",
+          "label": "n.commandMenuAvailabilityChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.commandMenuAvailabilityChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11921
+              },
+              "end": {
+                "line": 1,
+                "column": 11975
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_84828c92cabc8f0c55c43e268fac1f57670747b6dad74a7d4132d0633697fb6c",
+          "label": "n.reviewPreviewContinueSignIn",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.reviewPreviewContinueSignIn",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8738
+              },
+              "end": {
+                "line": 1,
+                "column": 8791
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_8542d500946c7ebb2b775352241cf0946a85400861a69ee94321bad3839d2e46",
+          "label": "n.reviewPreviewSignIn",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.reviewPreviewSignIn",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8661
+              },
+              "end": {
+                "line": 1,
+                "column": 8706
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_86bf4e6b88741fd1e3e6c911c1aae6fe7dbd088943f63b6b7dc1940e9499e4c4",
+          "label": "n.getInstalledTerminalApps",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.getInstalledTerminalApps",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15270
+              },
+              "end": {
+                "line": 1,
+                "column": 15318
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_875ebd193e3d1b0cfbd432ae72b18f582fdaa90a7a7d53ecbeecc5b74aca0f7e",
+          "label": "a",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "a",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10862
+              },
+              "end": {
+                "line": 1,
+                "column": 10885
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_87912551ff4d7097a3cf97831c2a33caddb51175702f4c46373ae82caa66b867",
+          "label": "n.reviewPreviewRequest",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.reviewPreviewRequest",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8589
+              },
+              "end": {
+                "line": 1,
+                "column": 8635
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_892ed2cb45ecbf66c399ef18233350473000475f086eda81dfc3160b070c1044",
+          "label": "n.contactForm",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.contactForm",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12621
+              },
+              "end": {
+                "line": 1,
+                "column": 12666
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_8a54a0a456651fa9ec0540bc405f477562b48390a60864fffe6482adaf01da33",
+          "label": "n.commandMenuAvailabilityChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.commandMenuAvailabilityChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11811
+              },
+              "end": {
+                "line": 1,
+                "column": 11865
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_8d33111fb5cbc575e2207a9b0f1d0ef56d9730a1576d7c8e72fc2021985f7d46",
+          "label": "n.openPreferences",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.openPreferences",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11677
+              },
+              "end": {
+                "line": 1,
+                "column": 11720
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_8e819e4379a73fc8aea8b96e831b32c14876bede6a798a937f5db3368681ac23",
+          "label": "n.flareCancelUpload",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.flareCancelUpload",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7873
+              },
+              "end": {
+                "line": 1,
+                "column": 7918
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_90d98b4055d4e04c39c12a432fdc68a689079bb927ef944e3982b88d10f9727c",
+          "label": "n.clientCloseWindow",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientCloseWindow",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14388
+              },
+              "end": {
+                "line": 1,
+                "column": 14427
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_9646cd192776f281d88d6f0809402bee15a69405972fcf7f4dee588de5756429",
+          "label": "n.reopenClosedTabRequested",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.reopenClosedTabRequested",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13384
+              },
+              "end": {
+                "line": 1,
+                "column": 13436
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_96812f5e67bb27f95efabadec0565d146dd68f1fb0c6de9543e71dcaffea176a",
+          "label": "n.newTab",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.newTab",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11613
+              },
+              "end": {
+                "line": 1,
+                "column": 11653
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_996c08bdcd8efdfbeca1bbb44bf3735fb5e5dc060f306a1d9941c41ec2ab99c0",
+          "label": "n.quitRequested",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.quitRequested",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13140
+              },
+              "end": {
+                "line": 1,
+                "column": 13236
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_9a1076e0a18f58b1fb3d23e7b914e48808cd521e1309159703a16f8251808c0c",
+          "label": "n.activate",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.activate",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9394
+              },
+              "end": {
+                "line": 1,
+                "column": 9424
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_9cc1d7b29c0e0bfe4637fb0920ee5767cfa68ebd37de27a7080dae1f850e25f3",
+          "label": "n.clientQuit",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientQuit",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13248
+              },
+              "end": {
+                "line": 1,
+                "column": 13280
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_9fab50a93adbb710139ef963efa3f486b830e6e45197ef4254c3e7a675c22b8d",
+          "label": "n.goBack",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.goBack",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9302
+              },
+              "end": {
+                "line": 1,
+                "column": 9330
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_9fdbcb9723b507a8135b652299f17122ac425a83a72a869c771955086de9add8",
+          "label": "n.clientLoginStatusChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientLoginStatusChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10147
+              },
+              "end": {
+                "line": 1,
+                "column": 10194
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_9fe653640dd03256ff8499fcb189ea6da696d87036840b9369c9c78c82c4f77a",
+          "label": "n.systemResume",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.systemResume",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15452
+              },
+              "end": {
+                "line": 1,
+                "column": 15492
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_a42ab5a7292eb58a592998f949579b0eb08b26bdec304daaea60c72213f494a8",
+          "label": "n.flareStart",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.flareStart",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7500
+              },
+              "end": {
+                "line": 1,
+                "column": 7532
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_a4419b9f7dfbc291afc04b26b0dde57b431bfb639d05ce2b4c884f59dd11d463",
+          "label": "n.forcePressEnabledChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.forcePressEnabledChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14065
+              },
+              "end": {
+                "line": 1,
+                "column": 14113
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_b26d34fe0507431961e163546703ce0774cf5a345a530afbc805469c56a50be5",
+          "label": "n.flareDiscard",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.flareDiscard",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7934
+              },
+              "end": {
+                "line": 1,
+                "column": 7974
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_b499fcd2215e22199d0ac44ddb7d0a139a1d1664efd8f269082d8bc45faa7b14",
+          "label": "n.setAlwaysShowTabBar",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.setAlwaysShowTabBar",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11251
+              },
+              "end": {
+                "line": 1,
+                "column": 11302
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_b5428c8a8b971772090a3db338634dfdaed1dd3877a56b9e35177e7e3e6e19c1",
+          "label": "n.runTerminalCommand",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.runTerminalCommand",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15039
+              },
+              "end": {
+                "line": 1,
+                "column": 15091
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_b5c76c04e81305d49c4357ca78c6d789da87a188ff63db7fc65050e1202421e2",
+          "label": "n.downloadComplete",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.downloadComplete",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14631
+              },
+              "end": {
+                "line": 1,
+                "column": 14684
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_b628e94da17969e503669a851a5bf7bb58ca917cb7ab370b5a9714c0d430838d",
+          "label": "n.enterFullScreen",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.enterFullScreen",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8357
+              },
+              "end": {
+                "line": 1,
+                "column": 8403
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_b67cab2fa29cd459a8bdadfcbf971a83d81a4ce98db73bd41c13883fa8f8fce6",
+          "label": "n.newProject",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.newProject",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11374
+              },
+              "end": {
+                "line": 1,
+                "column": 11412
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_b6e7f49496a3433aeba996ae2f4629f21c64fc31bf32974d0894ff3116e4aff5",
+          "label": "n.helpCenter",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.helpCenter",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12685
+              },
+              "end": {
+                "line": 1,
+                "column": 12729
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_baa46d094a26baff8f4c700f0430c784545bd0e5de08eed8248abff5a4c8a4ce",
+          "label": "n.flareStop",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.flareStop",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7638
+              },
+              "end": {
+                "line": 1,
+                "column": 7671
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_c334a67240cd7a8ea12e6be8c4494a1457ceaa464d19dd93c2488b43bd0925a9",
+          "label": "n.flareStart",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.flareStart",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 7592
+              },
+              "end": {
+                "line": 1,
+                "column": 7628
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_c45dcd70ec67b3a826e7fca0adea23b87a6a6331c77bf84a26712bd82febc664",
+          "label": "n.switchWorkspace",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.switchWorkspace",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11034
+              },
+              "end": {
+                "line": 1,
+                "column": 11075
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_c469d3e48c4bda1946a03da958af962ca6375eb4b15fd91eb793d76b53a1c986",
+          "label": "n.openAuthPopup",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.openAuthPopup",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10973
+              },
+              "end": {
+                "line": 1,
+                "column": 11014
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_c8d69fbe9fbda5957d53df62f031d4d35b174c16816939442f8447ce815fcb6f",
+          "label": "n.restart",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.restart",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9439
+              },
+              "end": {
+                "line": 1,
+                "column": 9468
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_c947d2b0dde9ddcc5e0f5adf299325e7a30f360d96eb20796cc71d545ac50f41",
+          "label": "n.ensureCustomTerminalConfig",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.ensureCustomTerminalConfig",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 15123
+              },
+              "end": {
+                "line": 1,
+                "column": 15173
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_cc65b9ab6325ac37661ce5c1ff48dbd98ae8bc76e6576992fce769c9611d0cbb",
+          "label": "n.captureScreenshot",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.captureScreenshot",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12312
+              },
+              "end": {
+                "line": 1,
+                "column": 12353
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_cd8e8d248fc918b8d81457ef6925a4a38d9717b73b163386258bf4437f5956f6",
+          "label": "n.setSentryUser",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.setSentryUser",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 10214
+              },
+              "end": {
+                "line": 1,
+                "column": 10251
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_ce3f83497014e344ff73392e28f447b8649fc4a8627382eb4a78a1e1482a759a",
+          "label": "n.performHapticFeedback",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.performHapticFeedback",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9185
+              },
+              "end": {
+                "line": 1,
+                "column": 9230
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_d8d020e2cccf4b0812a536e2c0bbbc70724e7e1ee3abd14dab0fc5f70231d6de",
+          "label": "n.reviewPreviewEvent",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.reviewPreviewEvent",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8844
+              },
+              "end": {
+                "line": 1,
+                "column": 8884
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_dcef0c2f3425889d392087ea122371372cb50a86bed80c0c23a757d2ef07d688",
+          "label": "n.setCommandMenuShortcutRecording",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.setCommandMenuShortcutRecording",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12545
+              },
+              "end": {
+                "line": 1,
+                "column": 12602
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_dd9df6cca26574a3496725600e0a1c65c8fac3f9876cc191622de2d78b0fffd2",
+          "label": "n.getCursorScreenPoint",
+          "properties": {
+            "side": "renderer",
+            "operation": "send-sync",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.getCursorScreenPoint",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9070
+              },
+              "end": {
+                "line": 1,
+                "column": 9116
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_df3d35b23e3792a584712203a8c347d78249b881f0891bcb854077a4ada261d0",
+          "label": "n.updateAvailable",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.updateAvailable",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14708
+              },
+              "end": {
+                "line": 1,
+                "column": 14761
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_e28b826898b4c32776d7ada63bb0c6fdbea7dd474f0a742e2d993cbcc0f7b743",
+          "label": "n.tabGoBack",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.tabGoBack",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 13454
+              },
+              "end": {
+                "line": 1,
+                "column": 13491
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_e8d36468faf4627ee916719fd07438f0a618a0cbf4b18388126d3d54367a24b0",
+          "label": "n.installUpdate",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.installUpdate",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14782
+              },
+              "end": {
+                "line": 1,
+                "column": 14817
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_ea0307472f578d22b85e389fd92630cde6f7eba61569f463323aaac7a6ee190d",
+          "label": "n.navigationStateChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.navigationStateChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8302
+              },
+              "end": {
+                "line": 1,
+                "column": 8356
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_ec95737fe4ec2b1281560167e5caea4a654a3f25de48cb29184041b6d6f4ae54",
+          "label": "n.leaveFullScreen",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.leaveFullScreen",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 8404
+              },
+              "end": {
+                "line": 1,
+                "column": 8450
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_f14c251f3c4d194c518dba977220d951b220a8877c40c2d92b397ac879db78a7",
+          "label": "n.setDockBadge",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.setDockBadge",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9492
+              },
+              "end": {
+                "line": 1,
+                "column": 9530
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_f28582297c5cb18ac18329f6b870acfe0adaf346fb2642a445cdacd4532d12ae",
+          "label": "n.navigationStateChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.navigationStateChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12898
+              },
+              "end": {
+                "line": 1,
+                "column": 12953
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_f48fafd0939d1ac7e9a7a3c97f8c846e01907c133378b756d48d635141ff6e59",
+          "label": "n.openFile",
+          "properties": {
+            "side": "renderer",
+            "operation": "invoke",
+            "mode": "invoke",
+            "channel": null,
+            "channel_expression": "n.openFile",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14894
+              },
+              "end": {
+                "line": 1,
+                "column": 14928
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_f4fbb7dc6bb7c7abd0ba44038be78486eb71bf572fbe1a3728b1678a50ef21a9",
+          "label": "n.forcePressCaptureChange",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.forcePressCaptureChange",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 14171
+              },
+              "end": {
+                "line": 1,
+                "column": 14223
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_f9123fed0501fc65389c44f2b39d7d9caed408673fd61bd062aee45b97492892",
+          "label": "n.clientAccountLoggedOut",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.clientAccountLoggedOut",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 11103
+              },
+              "end": {
+                "line": 1,
+                "column": 11147
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_f974edd3a647d60e415bdfc3b66c8bcee05cd35b47f29714b34b8e48cfb2b225",
+          "label": "n.enterFullScreen",
+          "properties": {
+            "side": "renderer",
+            "operation": "on",
+            "mode": "listen",
+            "channel": null,
+            "channel_expression": "n.enterFullScreen",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 12977
+              },
+              "end": {
+                "line": 1,
+                "column": 13020
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        },
+        {
+          "node_id": "jag_node_fd908752500759b3fc585563a6c74c8e7e72d2a1b4f16ac80a014b471844d81a",
+          "label": "n.goForward",
+          "properties": {
+            "side": "renderer",
+            "operation": "send",
+            "mode": "send",
+            "channel": null,
+            "channel_expression": "n.goForward",
+            "resolution": "dynamic"
+          },
+          "location": {
+            "available": true,
+            "value": {
+              "start": {
+                "line": 1,
+                "column": 9347
+              },
+              "end": {
+                "line": 1,
+                "column": 9378
+              },
+              "kind": "source-range",
+              "source": "out/preload/index.js"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "evidence_id": "ev_641d308485f487026b1ed5291e129cb0c0e70319413d3e7dee8f883c094fd205",
+      "operation": "observe_native_ui",
+      "parameters": {
+        "pid": 24969,
+        "window_id": 19638,
+        "screenshot": true,
+        "accessibility": true,
+        "max_nodes": 180,
+        "native_ui_deadline_ms": 45000,
+        "input_path": "/Applications/Linear.app"
+      },
+      "limitations": [
+        "Only the explicitly selected already-running process/window is admitted. REA starts no target process and does not change permissions, foreground applications, or restore application data.",
+        "Click uses AXPress; scroll uses AXIncrement/AXDecrement; key-entry sets the selected element's AXValue. Unsupported elements fail without global event fallback.",
+        "Each completed action is followed immediately by capture; delayed UI changes require explicit wait steps. A failed after-capture can follow a completed action, so failure does not prove absence of application effects.",
+        "Scenarios can change app data, cause app network activity and persist changes. The caller explicitly chooses leave-as-is; automatic restoration is unsupported.",
+        "Window matching uses exact PID and window ID for screenshots and unique accessibility geometry. Accessibility paths can change as the UI changes; stale or ambiguous paths fail. Screenshots are scaled to at most 2048 pixels; scenario output is budgeted at 64 MiB. Execution uses the selected native_ui_deadline_ms of 45000 ms (omitted means 180000). One wait step stays capped at 180000 ms and that cap has no runtime override."
+      ],
+      "relationship_coverage": null,
+      "complete_evidence": "artifacts/rea-core-ui-2026-11-19.json",
+      "window": {
+        "pid": 24969,
+        "window_id": 19638,
+        "executable": "/Applications/Linear.app/Contents/MacOS/Linear",
+        "launch_time": 1794910674.772564,
+        "title": "Reviews"
+      },
+      "truncated": true,
+      "observed_labels": [
+        "Reviews",
+        "Skip to content",
+        "xxh",
+        "Inbox",
+        "My issues",
+        "Reviews 5 pull requests",
+        "Agent",
+        "Workspace",
+        "Initiatives",
+        "Projects",
+        "Views",
+        "Loops",
+        "Your teams",
+        "Xxh Team menu Home Triage 3 issues to triage Issues Cycles Current Upcoming Projects Views",
+        "Xxh",
+        "Home",
+        "Triage",
+        "3",
+        "Issues",
+        "Cycles",
+        "Current",
+        "Upcoming",
+        "Try",
+        "Import issues",
+        "Dismiss",
+        "Invite people"
+      ]
+    }
+  ],
+  "target_version": {
+    "CFBundleIdentifier": "com.linear",
+    "CFBundleShortVersionString": "1.32.8",
+    "CFBundleVersion": "1.32.8"
+  }
+}

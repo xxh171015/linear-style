@@ -1,7 +1,24 @@
-import type { Activity, CustomView, InboxItem, Initiative, Issue, Project, ProjectMilestone, Review } from "./types";
+import type { Activity, CustomView, InboxItem, Initiative, Issue, IssueLabel, Project, ProjectMilestone, Review, Team } from "./types";
 
 export const CURRENT_USER = "徐兴华";
 export const TEAM_KEY = "XXH";
+export const DEFAULT_TEAM: Team = { id: "team-xxh", key: TEAM_KEY, name: "Xxh" };
+export const LABEL_COLOR_OPTIONS = [
+  { color: "#5e6ad2", name: "Indigo" },
+  { color: "#26b5ce", name: "Cyan" },
+  { color: "#4cb782", name: "Green" },
+  { color: "#f2c94c", name: "Yellow" },
+  { color: "#f2994a", name: "Orange" },
+  { color: "#eb5757", name: "Red" },
+  { color: "#bb87fc", name: "Purple" },
+  { color: "#eb57a0", name: "Pink" },
+] as const;
+export const LABEL_COLORS = LABEL_COLOR_OPTIONS.map((item) => item.color);
+export function labelColorFor(name: string) {
+  let total = 0;
+  for (const char of name) total += char.charCodeAt(0);
+  return LABEL_COLORS[total % LABEL_COLORS.length];
+}
 
 export const seedMilestones: ProjectMilestone[] = [
   { id: "ms-research", projectId: "personal-cadence", name: "调研", targetDate: "Nov 9", sortOrder: 1 },
@@ -249,3 +266,12 @@ export const seedReviews: Review[] = [
   { id: "r1", title: "fix: title bar traffic lights", author: "you", approved: false },
   { id: "r2", title: "style: Inter 13/500 controls", author: "xxh", approved: false },
 ];
+
+export const seedLabels: IssueLabel[] = [
+  ...new Set(seedIssues.flatMap((issue) => issue.labels)),
+].map((name) => ({
+  id: `label-${name.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
+  name,
+  color: labelColorFor(name),
+  teamKey: TEAM_KEY,
+}));

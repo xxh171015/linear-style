@@ -1,5 +1,13 @@
 # Linear 功能对齐清单与证据记录
 
+## 2026-11-19 多团队、标签目录、Pulse、估算／截止日期与桌面账号
+
+REA 对 `/Applications/Linear.app` 1.32.8 的本轮核对：Electron 壳 `@linear/desktop` 加载 `https://linear.app`，ASAR SHA-256 `5f13f9e9784b1c5a13b761ec50657879408084e8f8ee91fbfb3c6b1aa80b0dd8`。`analyze_javascript_application` 的路由视图为空，因为产品 UI 在托管站点而不在 ASAR。侧栏 AX 观察：Inbox、My issues、Reviews、Agent；Workspace 为 Initiatives、Projects、Views、Loops、More。More 两次点击未改变界面哈希，菜单内容仍未观察。Documents 在原版 More 下，本地 More 放置保持。未转储专有 JS。
+
+本地本轮：多团队（2–8 位 key、当前团队、按团队编号）、标签颜色目录、Pulse 动态源、创建表单估算／截止日期／团队、收藏改为 `{id,kind,targetId}` 并迁移旧的 `string[]`、账号服务按前缀预留编号、Electron `replica://` 使用 Bearer 会话并对 `replica://app` / `http://127.0.0.1:5174` 开放 CORS。桌面默认同机 IndexedDB；Settings 可连接 `http://127.0.0.1:4175`。Cookie 仍为 SameSite=Strict，跨源桌面请求不依赖 Cookie。
+
+仍未完成：自定义工作流状态、GitHub／Slack／真实 AI、邮件、30 天彻底清除、嵌套计划、More 菜单未观察项、完整 1:1。桌面连接账号服务后的浏览器／打包联调待本轮测试后验收。
+
 ## 2026-11-19 跨账号工作区与成员权限
 
 REA `observe_native_ui` 观察原版 Members，证据 `ev_b8ad7662677a8722e8789a076346b291d930dc68403ae40e54187ff3a4cd1642`；[去截图字节记录](rea-members-2026-11-19.json)，完整原始记录 `artifacts/rea-members-2026-11-19.json`，截图 `artifacts/qa/source-members-2026-11-19.png`。原版可见搜索入口、成员筛选、Name／Email／Role／Teams／Joined／Last seen 列、Export CSV 和 Invite；原版 CUA 核查还观察到邀请邮箱表单（已关闭，未发送）及 All／Members／Applications／Pending invites／Suspended／Left workspace 筛选。后两项为 CUA 观察，未伪记成单张 REA 记录覆盖。未修改原版成员或权限。

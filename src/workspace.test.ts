@@ -6,12 +6,14 @@ import {
   CATEGORY,
   DEFAULT_DISPLAY,
   Workspace,
+  currentTeam,
   cyclePhase,
   displayIssues,
   initialData,
   initiativeProgress,
   matchesFilter,
   migrateData,
+  pulseEntries,
   type Repository,
   type WorkspaceData,
 } from "./workspace";
@@ -668,6 +670,36 @@ describe("reactions and reusable issue templates",()=>{
     const w=fresh();w.saveIssueTemplate("Safe",{...w.getSnapshot().draft,relation:{issueId:"XXH-1",mode:"related"}} as import("./types").IssueDraft);
     expect(w.getSnapshot().templates[0].fields).not.toHaveProperty("relation");
     const raw=w.getSnapshot();delete (raw as Partial<WorkspaceData>).templates;expect(migrateData(raw).templates).toEqual([]);
+  });
+});
+
+describe("teams, labels, pulse and typed favorites", () => {
+  test("legacy string favorites migrate and new teams allocate their own identifiers", () => {
+    const migrated = migrateData({ ...initialData(), favorites: ["XXH-1"] } as unknown);
+    expect(migrated.favorites).toEqual([{ id: "issue:XXH-1", kind: "issue", targetId: "XXH-1" }]);
+    expect(migrated.teams[0].key).toBe("XXH");
+    expect(migrated.labels.length).toBeGreaterThan(0);
+    const w = fresh();
+    w.createTeam({ key: "eng", name: "Engineering" });
+    expect(currentTeam(w.getSnapshot()).key).toBe("ENG");
+    expect(w.createIssue({ title: "From engineering" }).id).toBe("ENG-1");
+    expect(w.createIssue({ title: "Still xxh", teamKey: "XXH" }).id).toBe("XXH-1");
+    w.saveLabel({ name: "spike", color: "#5e6ad2" });
+    w.toggleFavorite("issue", "ENG-1");
+    expect(w.getSnapshot().labels.some((label) => label.name === "spike")).toBe(true);
+    expect(w.getSnapshot().favorites).toEqual([{ id: "issue:ENG-1", kind: "issue", targetId: "ENG-1" }]);
+    w.toggleFavorite("issue", "ENG-1");
+    expect(w.getSnapshot().favorites).toEqual([]);
+  });
+  test("pulse lists project updates and issue activity, and filters can require a team or due date", () => {
+    const data = initialData();
+    expect(pulseEntries(data).length).toBeGreaterThan(0);
+    const w = fresh();
+    const issue = w.createIssue({ title: "Dated", dueDate: "2026-12-01", estimate: 2, labels: ["new-label"] });
+    expect(w.getSnapshot().labels.some((label) => label.name === "new-label")).toBe(true);
+    expect(matchesFilter(issue, { due: "set", estimate: "set", teamKey: "XXH" }, data.settings.user)).toBe(true);
+    expect(matchesFilter(issue, { due: "unset" }, data.settings.user)).toBe(false);
+    expect(readRoute("#/pulse")).toEqual({ nav: "pulse" });
   });
 });
 

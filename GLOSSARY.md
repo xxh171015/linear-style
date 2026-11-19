@@ -13,8 +13,16 @@ A named state: backlog, todo, progress, review, done, canceled, duplicate, or tr
 _Avoid_: WorkflowState, state, status category
 
 **Team**:
-The home of Issues. This replica has one, treated as environment, not a thing the user switches.
+The home of Issues, with a unique 2–8 character key used in identifiers (`{teamKey}-{number}`). A workspace may contain several Teams; Home, Triage, Issues and Cycles follow the selected Team. My Issues stays workspace-wide.
 _Avoid_: Workspace, organization (for this role)
+
+**Label**:
+A named, colored tag on Issues. Names still live on each Issue; the workspace also keeps a color catalog per Team.
+_Avoid_: Tag, skill
+
+**Pulse**:
+A feed of Project updates, Initiative updates and Issue activity. Local composition only; Linear's hosted ranking and notifications are unverified.
+_Avoid_: Inbox, Activity (unqualified)
 
 **Estimate**:
 Optional size of an Issue in points. Absent means unestimated, not zero.
@@ -44,7 +52,7 @@ A named, locally shareable saved query over Issues or Projects. Its query is dis
 _Avoid_: View (unqualified), saved search, View Preferences, FilterMatcher
 
 **View filter**:
-The Custom View's membership. Issue queries support independent AND/OR condition groups and text, ownership, status, Project, Cycle, label and priority conditions. Project queries use their own Project statuses, lead, text, labels and priority. An empty filter is unconstrained; priority 0 is a set condition.
+The Custom View's membership. Issue queries support independent AND/OR condition groups and text, ownership, status, Project, Cycle, label, Team, due date, estimate and priority conditions. Project queries use their own Project statuses, lead, text, labels and priority. An empty filter is unconstrained; priority 0 is a set condition.
 _Avoid_: CustomViewFilter (Linear's name for filtering the list of views), IssueFilter
 
 **Built-in list**:

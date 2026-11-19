@@ -13,9 +13,32 @@ export type NavId =
   | "initiatives"
   | "settings"
   | "archive"
-  | "documents";
+  | "documents"
+  | "pulse";
 
 export type IssueTab = "assigned" | "created" | "subscribed" | "activity";
+
+export type Team = {
+  id: string;
+  key: string;
+  name: string;
+  createdAt?: string;
+};
+
+export type IssueLabel = {
+  id: string;
+  name: string;
+  color: string;
+  teamKey?: string;
+};
+
+export type FavoriteKind = "issue" | "project" | "view" | "document";
+
+export type Favorite = {
+  id: string;
+  kind: FavoriteKind;
+  targetId: string;
+};
 
 export type ProjectTab = "overview" | "activity" | "issues";
 
@@ -196,6 +219,9 @@ export type CustomViewFilter = {
   labels?: string[];
   priority?: Priority;
   cycleId?: string;
+  teamKey?: string;
+  due?: "set" | "unset";
+  estimate?: "set" | "unset";
   query?: string;
   and?: CustomViewFilter[];
   or?: CustomViewFilter[];
@@ -258,6 +284,7 @@ export type Cycle = {
   endDate: string;
   capacity: number;
   description: string;
+  teamKey?: string;
 };
 export type Attachment = {
   id: string;
@@ -344,6 +371,9 @@ export type IssueDraft = {
   cycleId?: string;
   parentId?: string;
   labels: string[];
+  teamKey?: string;
+  estimate?: number;
+  dueDate?: string;
 };
 
 

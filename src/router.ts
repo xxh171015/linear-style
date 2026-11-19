@@ -39,6 +39,7 @@ export function readRoute(hash = window.location.hash): Route {
       "settings",
       "archive",
       "documents",
+      "pulse",
     ].includes(first)
   )
     return { nav: first as NavId, id, section };

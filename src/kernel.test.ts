@@ -117,6 +117,17 @@ describe("Issue identifier and create defaults", () => {
     });
     expect(created.status).toBe("progress");
   });
+
+  test("createIssue can target another team key and view filters honor due and estimate", () => {
+    const kernel = createKernel({ viewer, teamKey });
+    const other = kernel.createIssue({ title: "Other team", teamKey: "ENG", estimate: 3 });
+    expect(other.id).toBe("ENG-1");
+    expect(other.teamKey).toBe("ENG");
+    const dated = kernel.createIssue({ title: "Dated", estimate: 1 });
+    expect(kernel.updateIssue(dated.id, { dueDate: "2026-12-02" }).ok).toBe(true);
+    kernel.createCustomView({ name: "Due estimated", filter: { due: "set", estimate: "set" } });
+    expect(kernel.customViewIssues("due-estimated").map((item) => item.id)).toEqual([dated.id]);
+  });
 });
 
 describe("Issue status and Estimate", () => {

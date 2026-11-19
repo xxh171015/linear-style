@@ -11,14 +11,14 @@ function split(data:Wire) {
   const personal:Record<string,unknown>={};
   for(const key of personalKeys)personal[key]=data[key];
   personal.attachments=data.attachments.filter(file=>privateOwners.has(String(file.ownerId)));
-  personal.settings={weekStartsOn:data.settings.weekStartsOn,desktopNotifications:data.settings.desktopNotifications};
+  personal.settings={weekStartsOn:data.settings.weekStartsOn,desktopNotifications:data.settings.desktopNotifications,currentTeamKey:data.settings.currentTeamKey};
   personal.issueSubscriptions=data.issues.filter(issue=>issue.subscribed).map(issue=>issue.id);
   const shared={...data,attachments:data.attachments.filter(file=>!privateOwners.has(String(file.ownerId))),settings:{workspace:data.settings.workspace}} as unknown as Record<string,unknown>;
   shared.issues=data.issues.map(({subscribed:_,...issue})=>issue);
   for(const key of personalKeys)delete shared[key];
   return {shared,personal};
 }
-function blankPersonal() {return {inbox:[],chats:[],draft:{title:"",body:"",status:"backlog",priority:0,labels:[]},preferences:{},projectPreferences:{},favorites:[],attachments:[],issueSubscriptions:[],settings:{weekStartsOn:1}};}
+function blankPersonal() {return {inbox:[],chats:[],draft:{title:"",body:"",status:"backlog",priority:0,labels:[]},preferences:{},projectPreferences:{},favorites:[],attachments:[],issueSubscriptions:[],settings:{weekStartsOn:1,currentTeamKey:"XXH"}};}
 
 /** The legacy workspaces.user_id column is retained as a stable workspace ID. */
 export function workspaceService(db:DatabaseSync) {

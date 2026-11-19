@@ -40,6 +40,7 @@ import { IssueList, DisplayMenu, FilterBuilder } from "./issue-ui";
 import {
   DEFAULT_DISPLAY,
   LOOP_TEMPLATES,
+  currentTeam,
   cyclePhase,
   day,
   displayIssues,
@@ -47,11 +48,14 @@ import {
   initiativeProgress,
   migrateData,
   matchesProjectFilter,
+  pulseEntries,
   stamp,
   uid,
   type WorkspaceData,
 } from "./workspace";
+import { LABEL_COLOR_OPTIONS, LABEL_COLORS } from "./data";
 import { navigate, type Route } from "./router";
+import { accountApiBase, accountEnabled, setAccountApiBase, setAccountEnabled } from "./remote-repository";
 import { localAgent } from "./adapters";
 import { IssueTemplateSettings } from "./template-ui";
 import { ProjectCollection } from "./project-views";
@@ -118,12 +122,42 @@ function Meter({ value }: { value: number }) {
     </span>
   );
 }
+export function PulsePage({ onIssue }: { onIssue: (id: string) => void }) {
+  const data = useData();
+  const items = pulseEntries(data);
+  return (
+    <>
+      <PageHeader title="Pulse" />
+      {items.length ? (
+        <div className="r-pulse-feed">
+          {items.map((item) => (
+            <a key={item.id} className="r-pulse-item" href={item.href} onClick={(event) => {
+              if (item.kind === "issue") {
+                event.preventDefault();
+                onIssue(item.title);
+              }
+            }}>
+              <span className="r-chip">{item.kind}</span>
+              <strong>{item.title}</strong>
+              <p>{item.body}</p>
+              <span className="r-muted">{item.author} · {item.time}</span>
+            </a>
+          ))}
+        </div>
+      ) : (
+        <Empty title="No updates yet" description="Project, initiative and issue activity will appear here." />
+      )}
+    </>
+  );
+}
 export function CyclesPage({ route, onIssue, onCreate }: PageProps) {
   const data = useData(),
     workspace = useWorkspace();
+  const team = currentTeam(data);
+  const cycles = data.cycles.filter((c) => (c.teamKey || team.key) === team.key);
   const [editing, setEditing] = useState<Cycle | null>(null),
     [error, setError] = useState("");
-  const cycle = data.cycles.find(
+  const cycle = cycles.find(
     (c) =>
       c.id === route.id ||
       (route.id === "current" && cyclePhase(c) === "Current") ||
@@ -141,6 +175,7 @@ export function CyclesPage({ route, onIssue, onCreate }: PageProps) {
       endDate: day(end),
       capacity: 8,
       description: "",
+      teamKey: team.key,
     });
   };
   return (
@@ -225,7 +260,7 @@ export function CyclesPage({ route, onIssue, onCreate }: PageProps) {
         </>
       ) : (
         <div className="r-cycle-list">
-          {[...data.cycles]
+          {[...cycles]
             .sort((a, b) => b.startDate.localeCompare(a.startDate))
             .map((c) => {
               const p = estimateProgress(
@@ -2221,11 +2256,13 @@ export function LoopsPage({ route }: PageProps) {
 }
 export function HomePage({ onIssue, onCreate }: PageProps) {
   const data = useData();
-  const current = data.cycles.find((c) => cyclePhase(c) === "Current");
+  const team = currentTeam(data);
+  const issues = data.issues.filter((i) => (i.teamKey || team.key) === team.key);
+  const current = data.cycles.find((c) => (c.teamKey || team.key) === team.key && cyclePhase(c) === "Current");
   return (
     <>
       <PageHeader
-        title="Xxh"
+        title={team.name}
         actions={<Button onClick={() => onCreate()}>New issue</Button>}
       />
       <div className="r-document">
@@ -2234,7 +2271,7 @@ export function HomePage({ onIssue, onCreate }: PageProps) {
           <a href="#/triage">
             <I.InboxIcon />
             <strong>
-              {data.issues.filter((i) => i.status === "triage").length}
+              {issues.filter((i) => i.status === "triage").length}
             </strong>
             <span>Issues to triage</span>
           </a>
@@ -2246,13 +2283,13 @@ export function HomePage({ onIssue, onCreate }: PageProps) {
           <a href="#/projects">
             <I.CubeIcon />
             <strong>
-              {data.projects.filter((p) => p.status === "started").length}
+              {data.projects.filter((p) => p.status === "started" && (!p.teamKeys.length || p.teamKeys.includes(team.key))).length}
             </strong>
             <span>Active projects</span>
           </a>
         </div>
         <h3>Recent activity</h3>
-        {data.activity.slice(0, 20).map((a) => (
+        {data.activity.filter((a) => issues.some((issue) => issue.id === a.issueId)).slice(0, 20).map((a) => (
           <button
             className="r-home-event"
             key={a.id}
@@ -2620,7 +2657,12 @@ export function SettingsPage({section,invite=false}:{section?:string;invite?:boo
   const data = useAllData(),
     workspace = useWorkspace();
   const [error, setError] = useState(""),
-    [imported, setImported] = useState<WorkspaceData | null>(null);
+    [imported, setImported] = useState<WorkspaceData | null>(null),
+    [teamKey, setTeamKey] = useState(""),
+    [teamName, setTeamName] = useState(""),
+    [labelName, setLabelName] = useState(""),
+    [labelColorValue, setLabelColorValue] = useState<string>(LABEL_COLORS[0]),
+    [serverOrigin, setServerOrigin] = useState(() => accountApiBase() || "http://127.0.0.1:4175");
   async function exportBackup() {
     try {
       const json = {
@@ -2697,6 +2739,87 @@ export function SettingsPage({section,invite=false}:{section?:string;invite?:boo
           />
         </Field>
         <IssueTemplateSettings/>
+        {window.replicaDesktop && (
+          <section>
+            <h2>Desktop account</h2>
+            <p className="r-muted">The packaged app cannot send SameSite cookies to a local account server. Sign-in uses a Bearer session and CORS for replica://app.</p>
+            <Field label="Account server">
+              <input value={serverOrigin} onChange={(e) => setServerOrigin(e.target.value)} placeholder="http://127.0.0.1:4175" />
+            </Field>
+            <div className="r-inline">
+              <Button onClick={() => {
+                try {
+                  const url = new URL(serverOrigin);
+                  if (!["http:", "https:"].includes(url.protocol) || (url.hostname !== "127.0.0.1" && url.hostname !== "localhost"))
+                    throw Error("Use a local http://127.0.0.1 account server.");
+                  setAccountApiBase(url.origin);
+                  setAccountEnabled(true);
+                  window.location.reload();
+                } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+              }}>{accountEnabled() ? "Reconnect account server" : "Connect account server"}</Button>
+              {accountEnabled() && <Button onClick={() => { setAccountEnabled(false); window.location.reload(); }}>Use this device only</Button>}
+            </div>
+          </section>
+        )}
+        <h2>Teams</h2>
+        <p className="r-muted">Issues are identified as {"{team key}-{number}"}. Switching teams changes Home, Triage, Issues and Cycles.</p>
+        <ul className="r-settings-list">
+          {data.teams.map((item) => (
+            <li key={item.id}>
+              <span className="r-team-key">{item.key}</span>
+              {item.name}
+              {item.key === data.settings.currentTeamKey ? " · current" : (
+                <Button onClick={() => workspace.setCurrentTeam(item.key)}>Switch</Button>
+              )}
+            </li>
+          ))}
+        </ul>
+        <form className="r-inline" onSubmit={(e) => {
+          e.preventDefault();
+          try { workspace.createTeam({ key: teamKey, name: teamName }); setTeamKey(""); setTeamName(""); setError(""); }
+          catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+        }}>
+          <Field label="Key"><input required maxLength={8} value={teamKey} onChange={(e) => setTeamKey(e.target.value.toUpperCase())} placeholder="ENG" /></Field>
+          <Field label="Name"><input required value={teamName} onChange={(e) => setTeamName(e.target.value)} placeholder="Engineering" /></Field>
+          <Button primary type="submit">Add team</Button>
+        </form>
+        <h2>Labels</h2>
+        <div className="r-label-catalog">
+          {data.labels.map((label) => (
+            <span key={label.id} className="r-issue-label" style={{ ["--label-color" as string]: label.color }}>
+              <i style={{ background: label.color }} />
+              {label.name}
+            </span>
+          ))}
+        </div>
+        <form className="r-inline" onSubmit={(e) => {
+          e.preventDefault();
+          try { workspace.saveLabel({ name: labelName, color: labelColorValue }); setLabelName(""); setError(""); }
+          catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+        }}>
+          <Field label="Name"><input required value={labelName} onChange={(e) => setLabelName(e.target.value)} placeholder="bug" /></Field>
+          <Field label="Color">
+            <div className="r-color-swatches" role="radiogroup" aria-label="Label color">
+              {LABEL_COLOR_OPTIONS.map(({ color, name }) => (
+                <button
+                  type="button"
+                  key={color}
+                  className="r-color-swatch"
+                  style={{ background: color }}
+                  title={name}
+                  aria-label={name}
+                  role="radio"
+                  aria-checked={labelColorValue === color}
+                  onClick={() => setLabelColorValue(color)}
+                />
+              ))}
+              <span className="r-color-swatch-name">
+                {LABEL_COLOR_OPTIONS.find((item) => item.color === labelColorValue)?.name ?? "Indigo"}
+              </span>
+            </div>
+          </Field>
+          <Button primary type="submit">Add label</Button>
+        </form>
         <h3>Notifications</h3>
         <label className="r-check-line"><span>Desktop notifications</span><input type="checkbox" aria-label="Desktop notifications" disabled={!window.replicaDesktop?.notify} checked={!!data.settings.desktopNotifications} onChange={event=>workspace.mutate(d=>{d.settings.desktopNotifications=event.target.checked;})}/></label>
         <p className="r-muted">{window.replicaDesktop?.notify?"Show new inbox notifications while the desktop app is running. Your system notification settings also apply.":"Available in the desktop app."}</p>

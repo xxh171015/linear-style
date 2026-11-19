@@ -51,6 +51,14 @@ export function ReviewsIcon(props: IconProps) {
   );
 }
 
+export function PulseIcon(props: IconProps) {
+  return (
+    <I {...props}>
+      <path d="M1.6 8h2.1l1.4-3.4 2.2 6.8 1.6-3.4H14.4" />
+    </I>
+  );
+}
+
 export function AgentIcon(props: IconProps) {
   return (
     <I {...props}>

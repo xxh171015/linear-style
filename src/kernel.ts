@@ -80,6 +80,7 @@ export type CreateIssueInput = {
   projectId?: string;
   milestoneId?: string;
   date?: string;
+  teamKey?: string;
 };
 
 export type IssuePatch = {
@@ -382,7 +383,8 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
       return created;
     },
     createIssue(input) {
-      const id = nextIdentifier(issues, teamKey);
+      const issueTeam = input.teamKey || teamKey;
+      const id = nextIdentifier(issues, issueTeam);
       const created: Issue = {
         id,
         title: input.title.trim(),
@@ -392,7 +394,7 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
         labels: input.labels ? [...input.labels] : [],
         priority: input.priority ?? 0,
         subscribed: input.subscribed ?? false,
-        teamKey,
+        teamKey: issueTeam,
       };
       if (input.assignee) created.assignee = input.assignee;
       created.creator = input.creator ?? viewer;
@@ -742,6 +744,11 @@ function matchesViewFilter(
     return false;
   if (filter.priority !== undefined && issue.priority !== filter.priority)
     return false;
+  if (filter.teamKey && issue.teamKey !== filter.teamKey) return false;
+  if (filter.due === "set" && !issue.dueDate) return false;
+  if (filter.due === "unset" && issue.dueDate) return false;
+  if (filter.estimate === "set" && issue.estimate == null) return false;
+  if (filter.estimate === "unset" && issue.estimate != null) return false;
   return true;
 }
 

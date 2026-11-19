@@ -35,7 +35,7 @@ import {
   useAllData,
   useWorkspace,
 } from "./ui";
-import { DEFAULT_DISPLAY, emptyDraft, formatDate } from "./workspace";
+import { DEFAULT_DISPLAY, currentTeam, emptyDraft, favoriteOf, formatDate, labelColor } from "./workspace";
 import { IssueRelationMenu, IssueRelations, IssueDependencies, RelationPicker, DuplicateConfirmation, CanonicalIssue } from "./relation-ui";
 import { openBlockers, type IssueRelationMode } from "./relations";
 import { DeleteIssueDialog } from "./archive-ui";
@@ -279,10 +279,45 @@ export function FilterMenu({
           onChange={(next) => patch({ labels: next ? [next] : undefined })}
           options={[
             { value: "", label: "Any label" },
-            ...[...new Set(data.issues.flatMap((i) => i.labels))].map((l) => ({
+            ...[...new Set([...data.labels.map((l) => l.name), ...data.issues.flatMap((i) => i.labels)])].map((l) => ({
               value: l,
               label: l,
             })),
+          ]}
+        />
+      </Field>
+      <Field label="Team">
+        <Choice
+          label="Filter by team"
+          value={value.teamKey ?? ""}
+          onChange={(next) => patch({ teamKey: next || undefined })}
+          options={[
+            { value: "", label: "Any team" },
+            ...data.teams.map((team) => ({ value: team.key, label: `${team.key} · ${team.name}` })),
+          ]}
+        />
+      </Field>
+      <Field label="Due date">
+        <Choice
+          label="Filter by due date"
+          value={value.due ?? ""}
+          onChange={(next) => patch({ due: next === "set" || next === "unset" ? next : undefined })}
+          options={[
+            { value: "", label: "Any due date" },
+            { value: "set", label: "Has due date" },
+            { value: "unset", label: "No due date" },
+          ]}
+        />
+      </Field>
+      <Field label="Estimate">
+        <Choice
+          label="Filter by estimate"
+          value={value.estimate ?? ""}
+          onChange={(next) => patch({ estimate: next === "set" || next === "unset" ? next : undefined })}
+          options={[
+            { value: "", label: "Any estimate" },
+            { value: "set", label: "Estimated" },
+            { value: "unset", label: "Unestimated" },
           ]}
         />
       </Field>
@@ -509,7 +544,7 @@ export function IssueList({
                     {show("Labels") &&
                       issue.labels.slice(0, 2).map((l) => (
                         <span className="r-label" key={l}>
-                          <i />
+                          <i style={{ background: labelColor(data, l) }} />
                           {l}
                         </span>
                       ))}
@@ -675,6 +710,9 @@ export function IssueComposer({
               status: draft.status,
               priority: draft.priority,
               labels: draft.labels,
+              teamKey: draft.teamKey,
+              estimate: draft.estimate,
+              dueDate: draft.dueDate,
             }
           : emptyDraft();
       });
@@ -704,7 +742,7 @@ export function IssueComposer({
         className="r-composer"
       >
         <div className="r-crumb">
-          <Avatar name={data.settings.workspace} /> {TEAM_NAME} <span>›</span>{" "}
+          <Avatar name={data.settings.workspace} /> {currentTeam(data).name} <span>›</span>{" "}
           New issue <span className="r-push" />
           <Button onClick={onClose}>Save as draft</Button>
         </div>
@@ -785,13 +823,33 @@ export function IssueComposer({
             value={draft.cycleId ?? ""}
             options={[
               { value: "", label: "Cycle" },
-              ...data.cycles.map((c) => ({
+              ...data.cycles.filter((c) => (c.teamKey || currentTeam(data).key) === (draft.teamKey || currentTeam(data).key)).map((c) => ({
                 value: c.id,
                 label: c.name,
                 icon: <I.CalendarIcon />,
               })),
             ]}
             onChange={(value) => patch({ cycleId: value || undefined })}
+          />
+          <Choice
+            label="Change team"
+            value={draft.teamKey || currentTeam(data).key}
+            options={data.teams.map((team) => ({ value: team.key, label: team.key }))}
+            onChange={(value) => patch({ teamKey: value || undefined, cycleId: undefined })}
+          />
+          <input
+            aria-label="Estimate"
+            type="number"
+            min={0}
+            placeholder="Estimate"
+            value={draft.estimate ?? ""}
+            onChange={(e) => patch({ estimate: e.target.value === "" ? undefined : Number(e.target.value) })}
+          />
+          <input
+            aria-label="Due date"
+            type="date"
+            value={draft.dueDate ?? ""}
+            onChange={(e) => patch({ dueDate: e.target.value || undefined })}
           />
           <input
             aria-label="Labels"
@@ -803,6 +861,22 @@ export function IssueComposer({
               })
             }
           />
+          <div className="r-label-catalog">
+            {data.labels.map((label) => {
+              const on = draft.labels.includes(label.name);
+              return (
+                <button
+                  type="button"
+                  key={label.id}
+                  className={`r-issue-label ${on ? "active" : ""}`}
+                  onClick={() => patch({ labels: on ? draft.labels.filter((name) => name !== label.name) : [...draft.labels.filter(Boolean), label.name] })}
+                >
+                  <i style={{ background: label.color }} />
+                  {label.name}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <Attachments ownerId="draft" />
         {error && (
@@ -829,7 +903,6 @@ export function IssueComposer({
     </Dialog>
   );
 }
-const TEAM_NAME = "Xxh";
 export function IssueDetail({
   id,
   onClose,
@@ -974,17 +1047,11 @@ export function IssueDetail({
         <strong>{id}</strong>
         <IconButton
           label={
-            data.favorites.includes(id)
+            favoriteOf(data, "issue", id)
               ? "Remove from favorites"
               : "Add to favorites"
           }
-          onClick={() =>
-            workspace.mutate((d) => {
-              d.favorites = d.favorites.includes(id)
-                ? d.favorites.filter((value) => value !== id)
-                : [...d.favorites, id];
-            })
-          }
+          onClick={() => workspace.toggleFavorite("issue", id)}
         >
           <I.StarIcon />
         </IconButton>
@@ -1003,10 +1070,8 @@ export function IssueDetail({
           onCopyLink={() => void copy(window.replicaDesktop ? `linear-replica://issue/${encodeURIComponent(id)}` : `${location.origin}${location.pathname}#/issue/${id}`)}
           subscribed={issue.subscribed}
           onSubscribe={() => patch({ subscribed: !issue.subscribed }, issue.subscribed ? "unsubscribed" : "subscribed")}
-          favorited={data.favorites.includes(id)}
-          onFavorite={() => workspace.mutate((d) => {
-            d.favorites = d.favorites.includes(id) ? d.favorites.filter(value => value !== id) : [...d.favorites, id];
-          })}
+          favorited={!!favoriteOf(data, "issue", id)}
+          onFavorite={() => workspace.toggleFavorite("issue", id)}
         />
         <IconButton label="Copy issue ID" onClick={() => void copy(id)}>
           <I.DocsIcon />

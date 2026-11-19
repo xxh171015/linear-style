@@ -222,7 +222,7 @@ else {
       const target = localAsset(root, request.url);
       if (!target || !fs.existsSync(target) || !fs.statSync(target).isFile()) return new Response('Not found', {status:404});
       const result = await net.fetch(pathToFileURL(target).href), headers = new Headers(result.headers);
-      headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self'; connect-src 'self'; object-src 'none'; frame-src 'none'; base-uri 'none'");
+      headers.set('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https: http:; font-src 'self'; connect-src 'self' http://127.0.0.1:* http://localhost:*; object-src 'none'; frame-src 'none'; base-uri 'none'");
       return new Response(await result.arrayBuffer(), {status:result.status,headers});
     });
     installMenu();

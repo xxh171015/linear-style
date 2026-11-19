@@ -104,3 +104,43 @@ test("desktop notifications require opt-in, skip historical inbox items and noti
   await act(async()=>workspace.mutate(d=>{d.settings.desktopNotifications=true;}));expect(notify).toHaveBeenCalledTimes(1);
   await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
 });
+
+test("settings label color picker shows named swatches instead of hex codes",async()=>{
+  environment();
+  window.history.replaceState(null,"","#/settings");
+  const workspace=new Workspace(initialData());
+  const host=document.createElement("div"),root=createRoot(host);document.body.append(host);
+  await act(async()=>root.render(createElement(App,{workspace})));
+  const swatches=[...host.querySelectorAll<HTMLButtonElement>('[aria-label="Label color"] [role="radio"]')];
+  expect(swatches.map(button=>button.getAttribute("aria-label"))).toEqual(["Indigo","Cyan","Green","Yellow","Orange","Red","Purple","Pink"]);
+  expect(host.querySelector(".r-color-swatch-name")?.textContent).toBe("Indigo");
+  expect(host.textContent).not.toContain("#5e6ad2");
+  await act(async()=>swatches.find(button=>button.getAttribute("aria-label")==="Red")!.click());
+  expect(host.querySelector(".r-color-swatch-name")?.textContent).toBe("Red");
+  const name=host.querySelector<HTMLInputElement>('input[placeholder="bug"]');
+  await act(async()=>{Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,"value")!.set!.call(name,"regression");name!.dispatchEvent(new Event("input",{bubbles:true}));});
+  await act(async()=>host.querySelector(".r-color-swatches")!.closest("form")!.requestSubmit());
+  expect(workspace.getSnapshot().labels.find(label=>label.name==="regression")?.color).toBe("#eb5757");
+  await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+});
+
+test("workspace More stays open after choosing Documents, Archive or Settings",async()=>{
+  environment();
+  const workspace=new Workspace(initialData());
+  const host=document.createElement("div"),root=createRoot(host);document.body.append(host);
+  await act(async()=>root.render(createElement(App,{workspace})));
+  const more=host.querySelector(".r-nav-more > summary");
+  await act(async()=>(more as HTMLElement).click());
+  const documents=[...host.querySelectorAll(".r-workspace-more a")].find(link=>link.textContent?.includes("Documents"));
+  expect(documents).toBeTruthy();
+  await act(async()=>documents!.dispatchEvent(new MouseEvent("mousedown",{bubbles:true})));
+  expect([...host.querySelectorAll(".r-workspace-more a")].map(link=>link.getAttribute("href"))).toEqual(["#/documents","#/archive","#/settings"]);
+  await act(async()=>{
+    (documents as HTMLAnchorElement).click();
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  expect(location.hash).toBe("#/documents");
+  expect(host.querySelector(".r-nav-more")?.hasAttribute("open")).toBe(true);
+  expect(host.querySelector(".r-workspace-more")).not.toBeNull();
+  await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+});

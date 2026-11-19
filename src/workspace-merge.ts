@@ -47,10 +47,6 @@ export async function mergeWorkspace(base:WorkspaceData, local:WorkspaceData, sh
     if(path.endsWith(".updatedAt")||path.endsWith(".lastRunAt")) {
       if(typeof ours==="string"&&typeof theirs==="string")return ours>theirs?ours:theirs;
     }
-    if(path==="favorites"&&[before,ours,theirs].every(Array.isArray)) {
-      const b=before as string[],o=ours as string[],t=theirs as string[];
-      return [...new Set([...t.filter(id=>!b.includes(id)||o.includes(id)),...o.filter(id=>!b.includes(id))])];
-    }
     if(keyed(before)&&keyed(ours)&&keyed(theirs)) {
       const b=new Map(before.map(item=>[item.id,item])),o=new Map(ours.map(item=>[item.id,item])),t=new Map(theirs.map(item=>[item.id,item]));
       const ids=[...new Set([...ours.filter(item=>!b.has(item.id)).map(item=>item.id),...theirs.map(item=>item.id),...before.map(item=>item.id)])];
