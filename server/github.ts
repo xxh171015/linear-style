@@ -147,4 +147,4 @@ export async function githubComment(token: string, ref: GitHubPullRef, body: str
   );
 }
 
-export { parsePullRequestURL };
+export { parsePullRequestURL, repoAllowed };

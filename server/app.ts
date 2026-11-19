@@ -5,11 +5,12 @@ import { promisify } from "node:util";
 import { mkdirSync, chmodSync, existsSync, statSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { workspaceService, HTTPError, type Role } from "./workspaces";
-import { TEAM_KEY_PATTERN, initialData, uid } from "../src/workspace";
+import { TEAM_KEY_PATTERN, Workspace, initialData, uid } from "../src/workspace";
 import { decodeWorkspace, encodeWorkspace } from "../src/workspace-wire";
 import { connectionStore } from "./connections";
-import { assertAllowed, fetchPullReview, githubComment, githubLogin, githubTransition, parsePullRequestURL } from "./github";
+import { assertAllowed, fetchPullReview, githubComment, githubLogin, githubTransition, parsePullRequestURL, repoAllowed } from "./github";
 import { boundArgv, runCodingCommand } from "./coding";
+import type { ConnectionKind, Review } from "../src/types";
 import { applySharedWorkspace, startWorkspaceJobs } from "./scheduler";
 import { modelReply } from "./agent";
 import type { GithubConfig, ModelConfig, CodingConfig } from "./connections";
@@ -31,6 +32,25 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
   const connections=connectionStore(db);
   const streams=new Map<string,Map<ServerResponse,string>>(),rates=new Map<string,{count:number;until:number}>();
   function notifyWorkspace(id:string){for(const [stream] of streams.get(id)??[])if(!stream.writableEnded&&!stream.destroyed)stream.write("data: changed\n\n");}
+  function fanOutPending(workspaceId:string,items:{id:string}[]) {
+    if(!items.length)return;
+    spaces.fanOutInbox(workspaceId,items);
+    spaces.bumpRevision(workspaceId);
+    notifyWorkspace(workspaceId);
+  }
+  function applyReviewProjection(workspace:Workspace,reviewId:string,projection:Partial<Review>,decision?:"approve"|"request-changes") {
+    workspace.mutate(data=>{
+      const live=data.reviews.find(item=>item.id===reviewId);
+      if(!live)return;
+      let approved=live.approved;
+      if(projection.status==="merged"||decision==="approve")approved=true;
+      else if(decision==="request-changes")approved=false;
+      const status=projection.status==="merged"||projection.status==="closed"||projection.status==="draft"
+        ?projection.status
+        :decision==="approve"?"ready":decision==="request-changes"?"changes":live.status??projection.status;
+      Object.assign(live,projection,{id:reviewId,approved,status});
+    });
+  }
   const jobHooks={
     codingConfigured:(workspaceId:string)=>Boolean(connections.row(workspaceId,"coding")),
     githubConfigured:(workspaceId:string)=>Boolean(connections.row(workspaceId,"github")),
@@ -186,7 +206,7 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
         }
         if(route==="/api/connections"&&method==="GET")return respond(res,200,connections.status(selected));
         const connection=/^\/api\/connections\/(github|model|coding)$/.exec(route);
-        if(connection&&method==="DELETE"){spaces.admin(selected,account.id);connections.remove(selected,connection[1]);return respond(res,200,{ok:true});}
+        if(connection&&method==="DELETE"){spaces.admin(selected,account.id);connections.remove(selected,connection[1] as ConnectionKind);return respond(res,200,{ok:true});}
         if(connection&&method==="PUT") {
           spaces.admin(selected,account.id);
           const input=await body(req);
@@ -206,7 +226,7 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
             const argv=Array.isArray(input.argv)?input.argv.map((item:unknown)=>String(item)):undefined;
             const cwd=typeof input.cwd==="string"?input.cwd.trim():"";
             if(!argv?.length||!cwd||!path.isAbsolute(cwd))throw new HTTPError(400,"Configure argv and an absolute working directory.");
-            connections.put(selected,"coding","",{argv,cwd,timeoutMs:Number(input.timeoutMs)||30*60*1000} satisfies CodingConfig);
+            connections.put(selected,"coding","",{argv,cwd} satisfies CodingConfig);
           }
           return respond(res,200,connections.status(selected));
         }
@@ -216,15 +236,30 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
           const input=await body(req);
           const snapshot=await applySharedWorkspace(db,selected,async workspace=>{
             const existing=typeof input.reviewId==="string"?workspace.getSnapshot().reviews.find(review=>review.id===input.reviewId):undefined;
-            const ref=parsePullRequestURL(typeof input.url==="string"?input.url:existing?.url??"");
-            if(!ref)throw new HTTPError(400,"Enter a github.com pull request URL.");
-            assertAllowed(config.repos,ref);
-            const projection=await fetchPullReview(github.secret,ref);
-            workspace.mutate(data=>{
-              const match=data.reviews.find(review=>review.github?.owner===ref.owner&&review.github?.repo===ref.repo&&review.github?.number===ref.number)||(existing?data.reviews.find(review=>review.id===existing.id):undefined);
-              if(match)Object.assign(match,projection,{id:match.id});
-              else data.reviews.unshift({id:uid("review"),title:projection.title??`PR ${ref.number}`,author:projection.author??"",approved:!!projection.approved,...projection});
-            });
+            const wantsSingle=typeof input.url==="string"||typeof input.reviewId==="string";
+            const targets=wantsSingle
+              ? (()=>{
+                  const fallback=existing?.url??(existing?.github?`https://github.com/${existing.github.owner}/${existing.github.repo}/pull/${existing.github.number}`:"");
+                  const ref=parsePullRequestURL(typeof input.url==="string"?input.url:fallback);
+                  if(!ref)throw new HTTPError(400,"Enter a github.com pull request URL.");
+                  assertAllowed(config.repos,ref);
+                  return [{ref,existing}];
+                })()
+              : workspace.getSnapshot().reviews.flatMap(review=>{
+                  const url=review.url??(review.github?`https://github.com/${review.github.owner}/${review.github.repo}/pull/${review.github.number}`:"");
+                  const ref=parsePullRequestURL(url);
+                  if(!ref||!repoAllowed(config.repos,ref.owner,ref.repo))return [];
+                  return [{ref,existing:review}];
+                });
+            for(const target of targets) {
+              const projection=await fetchPullReview(github.secret,target.ref);
+              const match=workspace.getSnapshot().reviews.find(review=>review.github?.owner===target.ref.owner&&review.github?.repo===target.ref.repo&&review.github?.number===target.ref.number)
+                ||(target.existing?workspace.getSnapshot().reviews.find(review=>review.id===target.existing!.id):undefined);
+              if(match)applyReviewProjection(workspace,match.id,projection);
+              else workspace.mutate(data=>{
+                data.reviews.unshift({id:uid("review"),title:projection.title??`PR ${target.ref.number}`,author:projection.author??"",approved:!!projection.approved,...projection});
+              });
+            }
           });
           notifyWorkspace(selected);return respond(res,200,snapshot.reviews);
         }
@@ -239,13 +274,14 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
             if(!review?.github)throw new HTTPError(404,"This Review is not linked to GitHub.");
             assertAllowed(config.repos,review.github);
             const confirmation={id:uid("inbox"),issueId:review.issueIds?.[0]??review.id,kind:"confirmation" as const,text:`Confirm merge of ${review.title} as the Workspace GitHub PAT owner.`,time:new Date().toISOString(),read:false,confirmation:{action:"merge" as const,reviewId:review.id}};
-            spaces.fanOutInbox(selected,[confirmation]);
-            notifyWorkspace(selected);return respond(res,200,{pending:true,confirmationId:confirmation.id});
+            fanOutPending(selected,[confirmation]);
+            return respond(res,200,{pending:true,confirmationId:confirmation.id});
           }
           const snapshot=await applySharedWorkspace(db,selected,async workspace=>{
             const review=workspace.getSnapshot().reviews.find(item=>item.id===reviewId);
             if(!review?.github)throw new HTTPError(404,"This Review is not linked to GitHub.");
             assertAllowed(config.repos,review.github);
+            let decision:"approve"|"request-changes"|undefined;
             if(reviewAction[2]==="comments") {
               const text=typeof input.body==="string"?input.body.trim():"";
               if(!text)throw new HTTPError(400,"Enter a comment.");
@@ -253,12 +289,11 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
             } else {
               const action=input.action;
               if(!["approve","request-changes"].includes(action))throw new HTTPError(400,"Choose approve, request-changes or merge.");
-              await githubTransition(github.secret,review.github,action);
+              decision=action as "approve"|"request-changes";
+              await githubTransition(github.secret,review.github,decision);
             }
             const projection=await fetchPullReview(github.secret,review.github);
-            workspace.mutate(data=>{
-              const live=data.reviews.find(item=>item.id===review.id);if(live)Object.assign(live,projection,{id:review.id});
-            });
+            applyReviewProjection(workspace,review.id,projection,decision);
           });
           notifyWorkspace(selected);return respond(res,200,snapshot.reviews);
         }
@@ -311,7 +346,7 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
               const issue=workspace.getSnapshot().issues.find(entry=>entry.id===(request.issueId||item.issueId)&&!entry.deletedAt);
               if(!issue)throw new HTTPError(404,"Issue not found.");
               const bound=boundArgv(config,{issueId:issue.id,title:issue.title});
-              const result=await runCodingCommand(bound.argv,bound.cwd,bound.timeoutMs);
+              const result=await runCodingCommand(bound.argv,bound.cwd);
               workspace.mutate(data=>{
                 const run=data.runs.find(entry=>entry.id===request.loopRunId);
                 if(run){run.status=result.status;run.result=result.log;}
@@ -328,8 +363,8 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
               if(!review?.github)throw new HTTPError(404,"This Review is not linked to GitHub.");
               await githubTransition(github.secret,review.github,request.action as "approve"|"request-changes"|"merge");
               const projection=await fetchPullReview(github.secret,review.github);
+              applyReviewProjection(workspace,review.id,projection,request.action==="approve"||request.action==="request-changes"?request.action:undefined);
               workspace.mutate(data=>{
-                const live=data.reviews.find(entry=>entry.id===review.id);if(live)Object.assign(live,projection,{id:review.id});
                 const run=data.runs.find(entry=>entry.id===request.loopRunId);
                 if(run&&run.status==="pending"){run.status="completed";run.result=`Review ${request.action} confirmed.`;}
               });
@@ -350,7 +385,7 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
           const message=await modelReply(config.baseUrl,model.secret,config.model,text,digest);
           if(message.issueIds?.[0]) {
             const confirmation={id:uid("inbox"),issueId:message.issueIds[0],kind:"confirmation" as const,text:`Confirm Coding session for ${message.issueIds[0]}`,time:new Date().toISOString(),read:false,confirmation:{action:"coding-session" as const,issueId:message.issueIds[0]}};
-            spaces.fanOutInbox(selected,[confirmation]);
+            fanOutPending(selected,[confirmation]);
           }
           return respond(res,200,{message});
         }

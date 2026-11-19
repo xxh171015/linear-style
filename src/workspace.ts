@@ -1353,7 +1353,12 @@ export class Workspace {
       if (action === "accept" && team?.triageRotation?.length)
         this.mutate((d) => {
           const live = d.teams.find((item) => item.id === team.id);
-          if (live) assignee = nextRotationAssignee(live);
+          if (!live) return;
+          const rotated = nextRotationAssignee(live);
+          if (rotated) {
+            assignee = rotated.assignee;
+            live.triageRotationIndex = rotated.nextIndex;
+          }
         });
       this.updateIssue(
         id,
@@ -1366,11 +1371,11 @@ export class Workspace {
       );
     }
   }
-  saveIssueTemplate(name:string,fields:import("./types").IssueTemplate["fields"],id=uid("template"),extra?:{teamKey?:string;required?:TemplateRequiredField[]}) {
+  saveIssueTemplate(name:string,fields:import("./types").IssueTemplate["fields"],id=uid("template"),options?:{teamKey?:string;required?:TemplateRequiredField[]}) {
     if(!name.trim())throw Error("A template name is required.");
     const {relation:_relation,parentId:_parent,...safeFields}=fields as IssueDraft;
     this.mutate(d=>{
-      const template={id,name:name.trim(),fields:structuredClone(safeFields),teamKey:extra?.teamKey,required:extra?.required};
+      const template={id,name:name.trim(),fields:structuredClone(safeFields),teamKey:options?.teamKey,required:options?.required};
       validateIssueTemplate(template,d);
       const existing=d.templates.findIndex(item=>item.id===id);
       if(existing>=0 && d.templates[existing].deletedAt)throw Error("Restore this template before editing it.");
@@ -1753,6 +1758,24 @@ export class Workspace {
       }
     });
   }
+  private settleInboxConfirmation(
+    d: WorkspaceData,
+    id: string,
+    loopRunId: string | undefined,
+    status: LoopRun["status"],
+    result: string,
+    onlyPending = false,
+  ) {
+    const live = d.inbox.find((entry) => entry.id === id);
+    if (live) {
+      live.archivedAt = stamp();
+      live.read = true;
+    }
+    const run = d.runs.find((entry) => entry.id === loopRunId);
+    if (!run || (onlyPending && run.status !== "pending")) return;
+    run.status = status;
+    run.result = result;
+  }
   confirmInbox(id: string) {
     const item = this.data.inbox.find((entry) => entry.id === id);
     if (!item || item.kind !== "confirmation" || !item.confirmation || item.archivedAt)
@@ -1763,23 +1786,15 @@ export class Workspace {
       const started =
         this.services.automations.startCodingSession?.(issueId) ??
         this.services.automations.external("coding-session");
+      const status = started.status === "completed" ? "completed" : started.status === "limited" ? "limited" : "failed";
       this.mutate((d) => {
-        const live = d.inbox.find((entry) => entry.id === id);
-        if (live) {
-          live.archivedAt = stamp();
-          live.read = true;
-        }
-        const run = d.runs.find((entry) => entry.id === request.loopRunId);
-        if (run) {
-          run.status = started.status === "completed" ? "completed" : started.status === "limited" ? "limited" : "failed";
-          run.result = started.message;
-        }
+        this.settleInboxConfirmation(d, id, request.loopRunId, status, started.message);
         d.codingSessions.unshift({
           id: uid("coding"),
           issueId,
           argv: [],
           cwd: "",
-          status: started.status === "completed" ? "completed" : started.status === "limited" ? "limited" : "failed",
+          status,
           startedAt: stamp(),
           endedAt: stamp(),
           log: started.log ?? started.message,
@@ -1792,16 +1807,7 @@ export class Workspace {
       if (!request.reviewId) throw Error("Confirmation is missing a Review.");
       this.transitionReview(request.reviewId, request.action);
       this.mutate((d) => {
-        const live = d.inbox.find((entry) => entry.id === id);
-        if (live) {
-          live.archivedAt = stamp();
-          live.read = true;
-        }
-        const run = d.runs.find((entry) => entry.id === request.loopRunId);
-        if (run && run.status === "pending") {
-          run.status = "completed";
-          run.result = `Review ${request.action} confirmed.`;
-        }
+        this.settleInboxConfirmation(d, id, request.loopRunId, "completed", `Review ${request.action} confirmed.`, true);
       });
       return;
     }
@@ -1811,13 +1817,7 @@ export class Workspace {
     this.mutate((d) => {
       const item = d.inbox.find((entry) => entry.id === id && entry.kind === "confirmation");
       if (!item) throw Error("Confirmation not found.");
-      item.archivedAt = stamp();
-      item.read = true;
-      const run = d.runs.find((entry) => entry.id === item.confirmation?.loopRunId);
-      if (run && run.status === "pending") {
-        run.status = "failed";
-        run.result = "Cancelled by a member.";
-      }
+      this.settleInboxConfirmation(d, id, item.confirmation?.loopRunId, "failed", "Cancelled by a member.", true);
     });
   }
 }

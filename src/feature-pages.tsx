@@ -1393,19 +1393,14 @@ export function ReviewsPage({ route, onIssue }: PageProps) {
     if (!connected) return;
     let cancelled = false;
     const sync = async () => {
-      const current = workspace.getSnapshot().reviews;
-      const targets = review
-        ? current.filter((item) => item.id === review.id && (item.url || item.github))
-        : current.filter((item) => item.github || (item.url && parsePullRequestURL(item.url)));
-      for (const item of targets.slice(0, 8)) {
-        try {
-          await request("/api/reviews/sync", {
-            method: "POST",
-            body: JSON.stringify({ url: item.url, reviewId: item.id }),
-          });
-        } catch {
-          /* Keep the last saved projection. */
-        }
+      if (review && !(review.url || review.github)) return;
+      try {
+        await request("/api/reviews/sync", {
+          method: "POST",
+          body: JSON.stringify(review ? { url: review.url, reviewId: review.id } : {}),
+        });
+      } catch {
+        /* Keep the last saved projection. */
       }
       if (!cancelled) await workspace.refreshShared().catch(() => {});
     };
@@ -2883,7 +2878,7 @@ function ConnectionsSettings() {
     <section>
       <h2>Connections</h2>
       <p className="r-muted">
-        Admins paste secrets here. They stay on the account server. GitHub mutations appear as the PAT owner. Members can use a connected adapter; they cannot see the token.
+        Admins paste secrets here. They stay on the account server. GitHub mutations appear as the PAT owner. Members can use a connected adapter; they cannot see the secret.
       </p>
       {error && <p role="alert" className="r-error">{error}</p>}
       <h3>GitHub</h3>
@@ -3236,7 +3231,7 @@ export function SettingsPage({section,invite=false}:{section?:string;invite?:boo
         <p>
           {account
             ? "GitHub, model and coding Connections live in this Settings page. Unconnected adapters stay limited and never pretend to succeed."
-            : "This device is offline. Agent, reviews and automations stay local until you sign in and an admin pastes a Connection."}
+            : "This device is offline. Agent, Reviews and Loops stay local until you sign in and an admin pastes a Connection."}
         </p>
         <h3>Keyboard shortcuts</h3>
         <p>

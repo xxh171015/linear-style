@@ -5,6 +5,7 @@ import { HTTPError } from "./workspaces";
 import type { CodingConfig } from "./connections";
 
 const TOKENS = new Set(["{issueId}", "{title}", "{repoPath}"]);
+export const CODING_TIMEOUT_MS = 30 * 60 * 1000;
 
 export function boundArgv(config: CodingConfig, vars: { issueId: string; title: string }) {
   if (!Array.isArray(config.argv) || !config.argv.length || config.argv.some((part) => typeof part !== "string"))
@@ -25,11 +26,10 @@ export function boundArgv(config: CodingConfig, vars: { issueId: string; title: 
       if (arg.includes("{") || arg.includes("}")) throw new HTTPError(400, "Substitutions must be whole arguments.");
       return arg;
     }),
-    timeoutMs: Number.isInteger(config.timeoutMs) && config.timeoutMs > 0 ? Math.min(config.timeoutMs, 30 * 60 * 1000) : 30 * 60 * 1000,
   };
 }
 
-export function runCodingCommand(argv: string[], cwd: string, timeoutMs: number) {
+export function runCodingCommand(argv: string[], cwd: string) {
   return new Promise<{ status: "completed" | "failed"; log: string }>((resolve) => {
     const child = spawn(argv[0], argv.slice(1), {
       cwd,
@@ -45,7 +45,7 @@ export function runCodingCommand(argv: string[], cwd: string, timeoutMs: number)
     child.stderr?.on("data", append);
     const timer = setTimeout(() => {
       child.kill("SIGKILL");
-    }, timeoutMs);
+    }, CODING_TIMEOUT_MS);
     child.on("error", (error) => {
       clearTimeout(timer);
       resolve({ status: "failed", log: `${log}\n${error.message}`.trim() });

@@ -289,7 +289,9 @@ test("admins paste, rotate and disconnect Connections while members see redacted
     const status=await (await b.request("/api/connections",{headers})).json();
     expect(status.github).toEqual({connected:true,repos:["acme/web"],login:"mona"});
     expect(status.model).toEqual({connected:true,baseUrl:"https://models.example/v1"});
-    expect(status.coding).toMatchObject({configured:true,argv:["rotated"],cwd});
+    expect(status.coding).toEqual({configured:true,argv:["rotated"],cwd});
+    expect(status.coding).not.toHaveProperty("timeoutMs");
+    expect(JSON.stringify(status)).not.toContain("timeoutMs");
     const leaked=JSON.stringify(status)+JSON.stringify(await (await b.request("/api/workspace",{headers})).json());
     expect(leaked).not.toContain("ghp_test");expect(leaked).not.toContain("ghp_rotated");expect(leaked).not.toContain("sk-secret");expect(leaked).not.toContain("sk-rotated");
     expect(githubCalls.every(line=>line==="GET https://api.github.com/user")).toBe(true);
@@ -367,12 +369,22 @@ test("GitHub merge waits for Confirmation and still reaches a member without a p
     expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
     expect((await a.request("/api/reviews/sync",{method:"POST",headers,body:JSON.stringify({url:"https://github.com/acme/app/pull/41"})})).status).toBe(200);
     const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
+    const rb=new RemoteRepository(b.request,undefined,workspaceId),bobBase=await rb.load(),replica=new Workspace(bobBase,rb);
+    const beforeRevision=replica.getSnapshot().revision;
+    expect(replica.getSnapshot().inbox.filter(item=>item.kind==="confirmation")).toEqual([]);
     const merge=await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"merge"})});
     expect(merge.status).toBe(200);expect(await merge.json()).toMatchObject({pending:true});
     expect(putMerge(calls)).toEqual([]);
-    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    const aliceWorkspace=await (await a.request("/api/workspace",{headers})).json();
+    expect(aliceWorkspace.revision).toBeGreaterThan(beforeRevision);
+    const confirmation=aliceWorkspace.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
     expect(confirmation.kind).toBe("confirmation");
     expect(confirmation.confirmation).toMatchObject({action:"merge",reviewId});
+    await replica.refreshShared();
+    expect(replica.getSnapshot().revision).toBe(aliceWorkspace.revision);
+    expect(replica.getSnapshot().inbox.find(item=>item.id===confirmation.id)?.confirmation).toMatchObject({action:"merge",reviewId});
+    replica.dispose();
+    expect((await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{id:string})=>item.id===confirmation.id).kind).toBe("confirmation");
     expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
     expect(putMerge(calls)).toHaveLength(1);
     expect(JSON.parse(putMerge(calls)[0].slice(putMerge(calls)[0].indexOf("{"))).merge_method).toBeUndefined();
@@ -390,8 +402,10 @@ test("Approve and request-changes call GitHub immediately and are not Confirmati
     const reviewId=(await (await a.request("/api/workspace",{headers})).json()).reviews[0].id as string;
     expect((await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"approve"})})).status).toBe(200);
     expect(calls.some(line=>line.startsWith("POST ")&&line.includes("/pulls/41/reviews")&&line.includes("APPROVE"))).toBe(true);
+    expect((await (await a.request("/api/workspace",{headers})).json()).reviews.find((item:{id:string})=>item.id===reviewId).approved).toBe(true);
     expect((await a.request(`/api/reviews/${reviewId}/transition`,{method:"POST",headers,body:JSON.stringify({action:"request-changes"})})).status).toBe(200);
     expect(calls.some(line=>line.startsWith("POST ")&&line.includes("/pulls/41/reviews")&&line.includes("REQUEST_CHANGES"))).toBe(true);
+    expect((await (await a.request("/api/workspace",{headers})).json()).reviews.find((item:{id:string})=>item.id===reviewId).approved).toBe(false);
     expect(putMerge(calls)).toEqual([]);
     const bob=(await (await b.request("/api/workspace",{headers})).json());
     expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
@@ -547,13 +561,24 @@ test("Agent-proposed Coding session is an Inbox Confirmation and confirm runs ar
     expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-coding",baseUrl:"https://models.example"})})).status).toBe(200);
     const coding=await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd})});
     expect(coding.status).toBe(200);
-    expect(await coding.json()).toMatchObject({coding:{configured:true,timeoutMs:30*60*1000,cwd,argv:[process.execPath,"-e","process.stdout.write('ok')"]}});
+    expect(await coding.json()).toEqual({github:{connected:false,repos:[]},model:{connected:true,baseUrl:"https://models.example"},coding:{configured:true,cwd,argv:[process.execPath,"-e","process.stdout.write('ok')"]}});
+    expect(JSON.stringify(await (await a.request("/api/connections",{headers})).json())).not.toContain("timeoutMs");
+    const rb=new RemoteRepository(b.request,undefined,workspaceId),bobBase=await rb.load(),replica=new Workspace(bobBase,rb);
+    const beforeRevision=replica.getSnapshot().revision;
+    expect(replica.getSnapshot().inbox.filter(item=>item.kind==="confirmation")).toEqual([]);
     const replied=await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Start a coding session"})});
     expect(replied.status).toBe(200);
     expect((await replied.json()).message.issueIds).toEqual([issue.id]);
+    const alice=await (await a.request("/api/workspace",{headers})).json();
+    expect(alice.revision).toBeGreaterThan(beforeRevision);
+    expect(alice.codingSessions).toEqual([]);
+    const confirmation=alice.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    await replica.refreshShared();
+    expect(replica.getSnapshot().inbox.find(item=>item.id===confirmation.id)?.confirmation).toMatchObject({action:"coding-session",issueId:issue.id});
+    replica.dispose();
     const bob=await (await b.request("/api/workspace",{headers})).json();
     expect(bob.codingSessions).toEqual([]);
-    const confirmation=bob.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).kind).toBe("confirmation");
     expect(confirmation.kind).toBe("confirmation");
     expect(confirmation.confirmation).toMatchObject({action:"coding-session",issueId:issue.id});
     expect((await (await a.request("/api/workspace",{headers})).json()).codingSessions).toEqual([]);
@@ -776,4 +801,79 @@ test("assign, raise-priority, summarize, and model Loop runs do not enqueue a Co
     expect(bob.inbox.filter((item:{kind?:string})=>item.kind==="confirmation")).toEqual([]);
     expect(JSON.stringify(payload)).not.toContain("sk-loop");
   } finally { globalThis.fetch=original; }
+}));
+test("Reviews list refresh updates every github.com pull URL including the ninth",async()=>fixture(async origin=>{
+  const c=client(origin);await c.register();
+  const original=globalThis.fetch,calls:string[]=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.startsWith("https://api.github.com")){
+      calls.push(`${init?.method??"GET"} ${url}`);
+      const pull=/\/repos\/([^/]+)\/([^/]+)\/pulls\/(\d+)(?:\/(.*))?$/.exec(new URL(url).pathname);
+      if(url.includes("/pulls/")&&url.endsWith("/comments"))throw new Error("line comments are out of scope");
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:"octocat"}),{headers:{"Content-Type":"application/json"}});
+      if(pull&&!pull[4]&&(!init?.method||init.method==="GET")){
+        const number=Number(pull[3]);
+        return new Response(JSON.stringify({title:`Synced ${number}`,user:{login:"octocat"},html_url:`https://github.com/${pull[1]}/${pull[2]}/pull/${number}`,merged:false,draft:false,state:"open",head:{sha:"abc"}}),{headers:{"Content-Type":"application/json"}});
+      }
+      if(url.endsWith("/files"))return new Response(JSON.stringify([{filename:"src/a.ts",status:"modified",patch:"+ok"}]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/issues/")&&url.endsWith("/comments"))return new Response(JSON.stringify([]),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/status"))return new Response(JSON.stringify({statuses:[]}),{headers:{"Content-Type":"application/json"}});
+      if(url.includes("/actions/runs"))return new Response(JSON.stringify({workflow_runs:[]}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${url}`);
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await c.request("/api/connections/github",{method:"PUT",body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(200);
+    const repo=new RemoteRepository(c.request),base=await repo.load(),w=new Workspace(base);
+    w.mutate(d=>{
+      d.reviews=[
+        ...Array.from({length:9},(_,index)=>({
+          id:`review-${index+1}`,
+          title:`Old ${index+1}`,
+          author:"Ada",
+          approved:false,
+          url:`https://github.com/acme/app/pull/${index+1}`,
+          github:{owner:"acme",repo:"app",number:index+1},
+        })),
+        {id:"review-local",title:"Local note",author:"Ada",approved:false,diff:"+local"},
+      ];
+    });
+    await repo.commit(w.getSnapshot(),base);
+    const synced=await c.request("/api/reviews/sync",{method:"POST",body:"{}"});
+    expect(synced.status).toBe(200);
+    const reviews=await synced.json() as {id:string;title:string}[];
+    expect(reviews.find(item=>item.id==="review-local")?.title).toBe("Local note");
+    expect(Array.from({length:9},(_,index)=>reviews.find(item=>item.id===`review-${index+1}`)?.title)).toEqual(
+      Array.from({length:9},(_,index)=>`Synced ${index+1}`),
+    );
+    expect(calls.filter(line=>/\/pulls\/\d+$/.test(line))).toHaveLength(9);
+    expect(calls.some(line=>/\/repos\/acme\/app\/pulls$/.test(line))).toBe(false);
+  } finally { globalThis.fetch=original; }
+}));
+test("Coding session child environment is PATH, HOME, and LANG only",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-env-"));
+  const previous=process.env.YUNJING_SECRET;
+  process.env.YUNJING_SECRET="should-not-leak";
+  try {
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write(Object.keys(process.env).sort().join(','))"],cwd})})).status).toBe(200);
+    const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+    w.createIssue({title:"bug"});
+    w.mutate(d=>{d.loops=[{id:"code",name:"Autofix",prompt:"",category:"Engineering",trigger:"manual",action:"coding-session",enabled:true}];d.runs=[];d.inbox=[];});
+    await repo.commit(w.getSnapshot(),base);
+    expect((await a.request("/api/loops/code/run",{method:"POST",headers})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    const log=(await (await a.request("/api/workspace",{headers})).json()).codingSessions[0].log as string;
+    const keys=log.split(",").filter(Boolean);
+    expect(keys.filter(key=>key!=="__CF_USER_TEXT_ENCODING").every(key=>["HOME","LANG","PATH"].includes(key))).toBe(true);
+    expect(keys).toContain("PATH");
+    expect(keys).not.toContain("YUNJING_SECRET");
+    expect(keys).not.toContain("USER");
+  } finally {
+    if(previous===undefined)delete process.env.YUNJING_SECRET;
+    else process.env.YUNJING_SECRET=previous;
+  }
 }));

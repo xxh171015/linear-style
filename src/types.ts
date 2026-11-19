@@ -453,5 +453,5 @@ export type ConnectionKind = "github" | "model" | "coding";
 export type ConnectionStatus = {
   github?: { connected: boolean; repos: string[]; login?: string };
   model?: { connected: boolean; baseUrl?: string; model?: string };
-  coding?: { configured: boolean; argv?: string[]; cwd?: string; timeoutMs?: number };
+  coding?: { configured: boolean; argv?: string[]; cwd?: string };
 };

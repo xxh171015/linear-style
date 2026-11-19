@@ -154,11 +154,25 @@ export function workspaceService(db:DatabaseSync) {
       if(copied.length){stored.inbox.unshift(...copied);savePersonal(workspaceId,row.user_id,stored);}
     }
   }
+  function bumpRevision(workspaceId:string) {
+    db.exec("BEGIN IMMEDIATE");
+    try {
+      const row=db.prepare("SELECT data,revision FROM workspaces WHERE user_id=?").get(workspaceId) as {data:string;revision:number}|undefined;
+      if(!row)throw new HTTPError(404,"Workspace not found.");
+      const data=JSON.parse(row.data) as {revision?:number};
+      const revision=row.revision+1;
+      data.revision=revision;
+      const updated=db.prepare("UPDATE workspaces SET revision=?,data=? WHERE user_id=? AND revision=?").run(revision,JSON.stringify(data),workspaceId,row.revision);
+      if(updated.changes!==1)throw new HTTPError(409,"The workspace changed in another session.");
+      db.exec("COMMIT");
+      return revision;
+    }catch(error){db.exec("ROLLBACK");throw error;}
+  }
   function updateMember(workspaceId:string,actorId:string,memberId:string,role:Role|undefined) {
     admin(workspaceId,actorId);const target=membership(workspaceId,memberId);
     if(target.role==="admin"&&role!=="admin"&&Number(db.prepare("SELECT count(*) AS n FROM workspace_members WHERE workspace_id=? AND role='admin'").get(workspaceId)!.n)<=1)throw new HTTPError(409,"Keep at least one workspace admin.");
     if(role)db.prepare("UPDATE workspace_members SET role=? WHERE workspace_id=? AND user_id=?").run(role,workspaceId,memberId);
     else db.prepare("DELETE FROM workspace_members WHERE workspace_id=? AND user_id=?").run(workspaceId,memberId);
   }
-  return {initialize,membership,admin,summary,read,write,roster,invite,accept,cancel,decline,updateMember,archiveInboxItem,fanOutInbox};
+  return {initialize,membership,admin,summary,read,write,roster,invite,accept,cancel,decline,updateMember,archiveInboxItem,fanOutInbox,bumpRevision};
 }

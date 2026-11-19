@@ -765,8 +765,11 @@ test("team triage destinations and Accept rotation replace the hardcoded Backlog
   w.triage(second.id, "accept");
   expect(w.getSnapshot().issues.find((issue) => issue.id === second.id)?.assignee).toBe("Bea");
   const third = w.createIssue({ title: "three", status: "triage" });
-  w.triage(third.id, "decline");
-  expect(w.getSnapshot().issues.find((issue) => issue.id === third.id)?.status).toBe("duplicate");
+  w.triage(third.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === third.id)?.assignee).toBe("Ada");
+  const fourth = w.createIssue({ title: "four", status: "triage" });
+  w.triage(fourth.id, "decline");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === fourth.id)?.status).toBe("duplicate");
 });
 
 test("required template fields block create until filled, then stamp the draft template", () => {

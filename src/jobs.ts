@@ -50,12 +50,11 @@ export function eventAlreadyRan(runs: LoopRun[], loopId: string, issueId: string
   );
 }
 
-export function nextRotationAssignee(team: Team): string | undefined {
+export function nextRotationAssignee(team: Pick<Team, "triageRotation" | "triageRotationIndex">): { assignee: string; nextIndex: number } | undefined {
   const list = (team.triageRotation ?? []).map((name) => name.trim()).filter(Boolean);
   if (!list.length) return undefined;
   const index = ((team.triageRotationIndex ?? 0) % list.length + list.length) % list.length;
-  team.triageRotationIndex = (index + 1) % list.length;
-  return list[index];
+  return { assignee: list[index], nextIndex: (index + 1) % list.length };
 }
 
 export function advanceCycles(
