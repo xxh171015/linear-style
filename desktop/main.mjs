@@ -12,8 +12,8 @@ const developmentURL = process.env.REPLICA_DEV_URL;
 const smoke = process.argv.includes('--smoke-test');
 const smokeDirectory = smoke ? fs.mkdtempSync(path.join(tmpdir(),'linear-replica-smoke-')) : undefined;
 if (developmentURL && !/^http:\/\/127\.0\.0\.1:\d+\/?$/.test(developmentURL)) throw Error('Development must use an explicit local preview.');
-app.setName('Linear Replica');
-app.setPath('userData', smokeDirectory ?? path.join(app.getPath('appData'), 'Linear Replica'));
+app.setName('云镜');
+app.setPath('userData', smokeDirectory ?? path.join(app.getPath('appData'), '云镜'));
 if(smokeDirectory)process.once('exit',()=>fs.rmSync(smokeDirectory,{recursive:true,force:true}));
 protocol.registerSchemesAsPrivileged([{ scheme: 'replica', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const windows = new Map();
@@ -120,7 +120,7 @@ function createWindow(route, restored) {
   if (quitting) return focusedWindow();
   const window = new BrowserWindow({ width: 1440, height: 900, minWidth: 480, minHeight: 500,
     ...restoredBounds(restored?.bounds),
-    title: 'Linear Replica', backgroundColor: '#09090a', show: false,
+    title: '云镜', backgroundColor: '#09090a', show: false,
     titleBarStyle: 'hidden', trafficLightPosition: { x: 16, y: 15 },
     webPreferences: { preload: path.join(directory, 'preload.cjs'), contextIsolation: true, sandbox: true, nodeIntegration: false, webSecurity: true },
   });
@@ -150,7 +150,7 @@ const commandItem = (label, accelerator, type) => ({ label, accelerator, click: 
 function installMenu() {
   const mac = process.platform === 'darwin';
   Menu.setApplicationMenu(Menu.buildFromTemplate([
-    ...(mac ? [{ label: 'Linear Replica', submenu: [{ role: 'about' }, { type: 'separator' }, commandItem('Settings…', 'CmdOrCtrl+,', 'settings'), { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] }] : []),
+    ...(mac ? [{ label: '云镜', submenu: [{ role: 'about' }, { type: 'separator' }, commandItem('Settings…', 'CmdOrCtrl+,', 'settings'), { type: 'separator' }, { role: 'hide' }, { role: 'hideOthers' }, { role: 'unhide' }, { type: 'separator' }, { role: 'quit' }] }] : []),
     { label: 'File', submenu: [
       {label:'New',submenu:[
         commandItem('Issue…','CmdOrCtrl+N','new-issue'),
