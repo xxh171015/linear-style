@@ -816,3 +816,141 @@ test("tick rolls a completed cycle and does not double-run a daily Loop", () => 
   w.tick(new Date("2026-11-16T18:00:00"));
   expect(w.getSnapshot().runs).toHaveLength(1);
 });
+
+test("Team Cycle duration is 1–366 days and tick auto-creates adjacent Cycles until one covers today", () => {
+  const w = fresh();
+  expect(() => w.updateTeam("XXH", { cycleDurationDays: 0 })).toThrow(/1–366/);
+  expect(() => w.updateTeam("XXH", { cycleDurationDays: 367 })).toThrow(/1–366/);
+  expect(() => w.updateTeam("XXH", { cycleDurationDays: 1.5 })).toThrow(/1–366/);
+  w.updateTeam("XXH", { cycleDurationDays: 1 });
+  w.updateTeam("XXH", { cycleDurationDays: 366 });
+  expect(w.getSnapshot().teams[0].cycleDurationDays).toBe(366);
+  w.mutate((d) => {
+    d.teams[0].cycleDurationDays = undefined;
+    d.cycles = [{
+      id: "c-ended",
+      number: 1,
+      name: "Cycle 1",
+      startDate: "2026-11-02",
+      endDate: "2026-11-08",
+      capacity: 8,
+      description: "",
+      teamKey: "XXH",
+    }];
+  });
+  w.tick(new Date("2026-11-19T12:00:00"));
+  expect(
+    w.getSnapshot().cycles.map((cycle) => [cycle.startDate, cycle.endDate]).sort(),
+  ).toEqual([
+    ["2026-11-02", "2026-11-08"],
+    ["2026-11-09", "2026-11-15"],
+    ["2026-11-16", "2026-11-22"],
+  ]);
+  w.updateTeam("XXH", { cycleDurationDays: 14 });
+  w.mutate((d) => {
+    d.cycles = [{
+      id: "c-long",
+      number: 1,
+      name: "Cycle 1",
+      startDate: "2026-10-19",
+      endDate: "2026-11-01",
+      capacity: 8,
+      description: "",
+      teamKey: "XXH",
+    }];
+  });
+  w.tick(new Date("2026-11-16T12:00:00"));
+  expect(
+    w.getSnapshot().cycles.map((cycle) => [cycle.startDate, cycle.endDate]).sort(),
+  ).toEqual([
+    ["2026-10-19", "2026-11-01"],
+    ["2026-11-02", "2026-11-15"],
+    ["2026-11-16", "2026-11-29"],
+  ]);
+});
+
+test("tick moves incomplete Issues including In Review onto the immediate successor, oldest completed Cycle first", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.cycles = [
+      { id: "c1", number: 1, name: "Cycle 1", startDate: "2026-11-02", endDate: "2026-11-08", capacity: 8, description: "", teamKey: "XXH" },
+      { id: "c2", number: 2, name: "Cycle 2", startDate: "2026-11-09", endDate: "2026-11-15", capacity: 8, description: "", teamKey: "XXH" },
+    ];
+  });
+  const review = w.createIssue({ title: "review", cycleId: "c1", status: "review" });
+  const todo = w.createIssue({ title: "todo", cycleId: "c2", status: "todo" });
+  const done = w.createIssue({ title: "done", cycleId: "c1", status: "done" });
+  const canceled = w.createIssue({ title: "canceled", cycleId: "c2", status: "canceled" });
+  const duplicate = w.createIssue({ title: "duplicate", cycleId: "c1", status: "duplicate" });
+  w.tick(new Date("2026-11-16T12:00:00"));
+  const current = w.getSnapshot().cycles.find((cycle) => cycle.startDate === "2026-11-16" && cycle.endDate === "2026-11-22");
+  expect(current).toBeTruthy();
+  const issues = w.getSnapshot().issues;
+  expect(issues.find((issue) => issue.id === review.id)?.cycleId).toBe(current!.id);
+  expect(issues.find((issue) => issue.id === todo.id)?.cycleId).toBe(current!.id);
+  expect(issues.find((issue) => issue.id === done.id)?.cycleId).toBe("c1");
+  expect(issues.find((issue) => issue.id === canceled.id)?.cycleId).toBe("c2");
+  expect(issues.find((issue) => issue.id === duplicate.id)?.cycleId).toBe("c1");
+});
+
+test("Accept with an empty rotation still writes the destination status", () => {
+  const w = fresh();
+  w.updateTeam("XXH", { triageAcceptStatus: "progress", triageRotation: [] });
+  const issue = w.createIssue({ title: "keep owner", status: "triage", assignee: "Keep" });
+  w.triage(issue.id, "accept");
+  expect(w.getSnapshot().issues.find((item) => item.id === issue.id)).toMatchObject({
+    status: "progress",
+    assignee: "Keep",
+  });
+});
+
+test("saving the Accept rotation list resets the rotation index", () => {
+  const w = fresh();
+  w.updateTeam("XXH", { triageRotation: ["Ada", "Bea"] });
+  const first = w.createIssue({ title: "one", status: "triage" });
+  w.triage(first.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === first.id)?.assignee).toBe("Ada");
+  w.updateTeam("XXH", { triageRotation: ["Ada", "Bea"] });
+  const second = w.createIssue({ title: "two", status: "triage" });
+  w.triage(second.id, "accept");
+  expect(w.getSnapshot().issues.find((issue) => issue.id === second.id)?.assignee).toBe("Ada");
+});
+
+test("a Template belongs to one Team or all Teams and apply only uses Templates for the current Team", () => {
+  const w = fresh();
+  const fields = { ...w.getSnapshot().draft, title: "From template" };
+  w.createTeam({ key: "ENG", name: "Engineering" });
+  const eng = w.saveIssueTemplate("Eng only", fields, undefined, { teamKey: "ENG" });
+  w.setCurrentTeam("XXH");
+  const xxh = w.saveIssueTemplate("Xxh only", fields, undefined, { teamKey: "XXH" });
+  const all = w.saveIssueTemplate("All teams", fields);
+  expect(w.getSnapshot().templates.find((template) => template.id === eng)?.teamKey).toBe("ENG");
+  expect(w.getSnapshot().templates.find((template) => template.id === xxh)?.teamKey).toBe("XXH");
+  expect(w.getSnapshot().templates.find((template) => template.id === all)?.teamKey).toBeUndefined();
+  w.setCurrentTeam("ENG");
+  w.applyIssueTemplate(eng);
+  expect(w.getSnapshot().draft.templateId).toBe(eng);
+  w.applyIssueTemplate(all);
+  expect(w.getSnapshot().draft.templateId).toBe(all);
+  const before = w.getSnapshot();
+  expect(() => w.applyIssueTemplate(xxh)).toThrow(/current Team/);
+  expect(w.getSnapshot()).toBe(before);
+});
+
+test("required assignee and status block create until filled", () => {
+  const w = fresh();
+  const assigneeId = w.saveIssueTemplate("Need assignee", { ...w.getSnapshot().draft, title: "Assigned" }, undefined, {
+    required: ["assignee"],
+  });
+  const beforeAssignee = w.getSnapshot();
+  expect(() => w.createIssue({ title: "Assigned", templateId: assigneeId })).toThrow(/assignee/);
+  expect(w.getSnapshot()).toBe(beforeAssignee);
+  expect(w.createIssue({ title: "Assigned", templateId: assigneeId, assignee: "Ada" }).assignee).toBe("Ada");
+  const statusId = w.saveIssueTemplate("Need status", { ...w.getSnapshot().draft, title: "Stateful" }, undefined, {
+    required: ["status"],
+  });
+  const beforeStatus = w.getSnapshot();
+  expect(() => w.createIssue({ title: "Stateful", templateId: statusId })).toThrow(/status/);
+  expect(w.getSnapshot()).toBe(beforeStatus);
+  expect(w.createIssue({ title: "Stateful", templateId: statusId, status: "todo" }).status).toBe("todo");
+});

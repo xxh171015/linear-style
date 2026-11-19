@@ -1387,6 +1387,7 @@ export class Workspace {
   applyIssueTemplate(id:string) {
     this.mutate(d=>{
       const template=d.templates.find(item=>item.id===id && !item.deletedAt);if(!template)throw Error("Template not found.");
+      if(template.teamKey && template.teamKey !== currentTeam(d).key) throw Error("This template does not apply to the current Team.");
       const current=d.draft,fields=template.fields;
       d.draft={...fields,...current,title:current.title || fields.title,body:current.body || fields.body,
         priority:current.priority || fields.priority,status:current.status!=="backlog"?current.status:fields.status,
