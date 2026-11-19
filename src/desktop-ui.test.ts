@@ -3,6 +3,7 @@ import { act, createElement } from "react";
 import { createRoot } from "react-dom/client";
 import { expect, test, vi } from "vitest";
 import App from "./App";
+import { AccountContext } from "./account-ui";
 import { initialData, Workspace } from "./workspace";
 import type { DesktopCommand } from "./desktop";
 
@@ -179,4 +180,34 @@ test("offline settings, inbox Confirmation, reviews and cycles expose the connec
   await act(async()=>e.command({type:"navigate",route:"#/loops"}));
   expect(host.textContent).toContain("Schedules run while this app is open");
   await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;
+});
+
+test("a hosted renderer does not tick Loops and says schedules run on the account server",async()=>{
+  const e=environment();
+  Object.defineProperty(navigator,"locks",{value:undefined,configurable:true});
+  vi.spyOn(document,"hasFocus").mockReturnValue(true);
+  vi.useFakeTimers();
+  const workspace=new Workspace(initialData(),{load:async()=>undefined,save:async()=>{},nextIssueIdentifier:()=>"XXH-1"});
+  const tick=vi.spyOn(workspace,"tick");
+  const account={
+    user:{id:"user-1",email:"qa@example.test",name:"QA"},
+    membership:{id:"ws-1",name:"QA workspace",role:"admin" as const},
+    summary:{workspaces:[{id:"ws-1",name:"QA workspace",role:"admin" as const}],invitations:[]},
+    members:[],
+    refreshMembers:async()=>{},
+    switchWorkspace:async()=>{},
+    signOut:async()=>{},
+    reconnect:()=>{},
+  };
+  const host=document.createElement("div");document.body.append(host);const root=createRoot(host);
+  try {
+    await act(async()=>root.render(createElement(AccountContext.Provider,{value:account},createElement(App,{workspace}))));
+    await act(async()=>{vi.advanceTimersByTime(60_000);});
+    expect(tick).not.toHaveBeenCalled();
+    await act(async()=>e.command({type:"navigate",route:"#/loops"}));
+    expect(host.textContent).toContain("Schedules run on the account server");
+    expect(host.textContent).toContain("limited means the adapter is not connected");
+  } finally {
+    await act(async()=>root.unmount());host.remove();delete window.replicaDesktop;vi.useRealTimers();vi.restoreAllMocks();
+  }
 });

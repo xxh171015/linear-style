@@ -411,3 +411,27 @@ test("tickWorkspaceRow auto-creates Cycles and rolls incomplete Issues for a sig
   expect(()=>hosted.createIssue({title:"From template",templateId})).toThrow(/assignee/);
   expect(hosted.createIssue({title:"From template",templateId,assignee:"Ada"}).assignee).toBe("Ada");
 }));
+test("hosted interval Loops tick once per period and retry a failed run after five minutes",async()=>fixture(async(origin,database)=>{
+  const c=client(origin),created=await c.register(),workspaceId=(await created.json()).user.id as string;
+  const repo=new RemoteRepository(c.request),base=await repo.load(),w=new Workspace(base);
+  const failedAt=new Date(2026,10,19,10,0,0);
+  w.mutate(d=>{
+    d.loops=[{id:"daily",name:"Daily",prompt:"",category:"Reporting",trigger:"daily",action:"summarize",enabled:true},{id:"retry",name:"Retry",prompt:"",category:"Reporting",trigger:"daily",action:"summarize",enabled:true},{id:"hourly",name:"Hourly",prompt:"",category:"Reporting",trigger:"hourly",action:"summarize",enabled:true}];
+    d.runs=[{id:"r-fail",loopId:"retry",time:failedAt.toISOString(),status:"failed",result:"boom",issueIds:[],periodStart:"2026-11-19"}];
+  });
+  await repo.commit(w.getSnapshot(),base);
+  const db=new DatabaseSync(database);
+  await tickWorkspaceRow(db,workspaceId,new Date(failedAt.getTime()+60_000));
+  const first=await repo.load();
+  expect(first.runs.filter(run=>run.loopId==="daily")).toHaveLength(1);
+  expect(first.runs.filter(run=>run.loopId==="hourly")).toHaveLength(1);
+  expect(first.runs.filter(run=>run.loopId==="retry")).toHaveLength(1);
+  expect(first.runs.find(run=>run.loopId==="daily")?.periodStart).toBe("2026-11-19");
+  expect(first.inbox.some(item=>item.kind==="confirmation")).toBe(false);
+  await tickWorkspaceRow(db,workspaceId,new Date(failedAt.getTime()+6*60_000));
+  const second=await repo.load();
+  expect(second.runs.filter(run=>run.loopId==="daily")).toHaveLength(1);
+  expect(second.runs.filter(run=>run.loopId==="hourly")).toHaveLength(1);
+  expect(second.runs.filter(run=>run.loopId==="retry")).toHaveLength(2);
+  db.close();
+}));

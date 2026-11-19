@@ -994,3 +994,73 @@ test("required assignee and status block create until filled", () => {
   expect(w.getSnapshot()).toBe(beforeStatus);
   expect(w.createIssue({ title: "Stateful", templateId: statusId, status: "todo" }).status).toBe("todo");
 });
+
+test("a failed interval run retries after five minutes", () => {
+  const w = fresh();
+  const failedAt = new Date(2026, 10, 19, 10, 0, 0);
+  w.mutate((d) => {
+    d.loops.push({
+      id: "daily",
+      name: "Daily",
+      prompt: "",
+      category: "Reporting",
+      trigger: "daily",
+      action: "summarize",
+      enabled: true,
+    });
+    d.runs.push({
+      id: "r-fail",
+      loopId: "daily",
+      time: failedAt.toISOString(),
+      status: "failed",
+      result: "boom",
+      issueIds: [],
+      periodStart: "2026-11-19",
+    });
+  });
+  w.tick(new Date(failedAt.getTime() + 60_000));
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  w.tick(new Date(failedAt.getTime() + 6 * 60_000));
+  expect(w.getSnapshot().runs).toHaveLength(2);
+  expect(w.getSnapshot().runs[0].periodStart).toBe("2026-11-19");
+});
+
+test("event-triggered Loops do not re-run the same Issue activity", () => {
+  const w = fresh();
+  w.mutate((d) =>
+    d.loops.push({
+      id: "watch",
+      name: "Watch",
+      prompt: "",
+      category: "Triage",
+      trigger: "issue-updated",
+      action: "summarize",
+      enabled: true,
+    }),
+  );
+  const issue = w.createIssue({ title: "live", status: "todo" });
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  expect(w.getSnapshot().runs[0]).toMatchObject({ loopId: "watch", triggerIssueId: issue.id });
+  const activityId = w.getSnapshot().runs[0].triggerActivityId;
+  expect(activityId).toBeTruthy();
+  w.updateIssue(issue.id, { priority: 2 });
+  expect(w.getSnapshot().runs).toHaveLength(1);
+  w.updateIssue(issue.id, { title: "renamed" }, "renamed");
+  expect(w.getSnapshot().runs).toHaveLength(2);
+  expect(w.getSnapshot().runs[0].triggerActivityId).not.toBe(activityId);
+});
+
+test("assign, raise-priority, and summarize Loops run without a Confirmation", () => {
+  const w = fresh();
+  w.mutate((d) => {
+    d.loops.push(
+      { id: "assign", name: "Assign", prompt: "", category: "Triage", trigger: "manual", action: "assign-owner", enabled: false, assignee: "Ada" },
+      { id: "priority", name: "Priority", prompt: "", category: "Triage", trigger: "manual", action: "raise-priority", enabled: false, minimumDemand: 2 },
+      { id: "summary", name: "Summary", prompt: "", category: "Reporting", trigger: "manual", action: "summarize", enabled: false },
+    );
+  });
+  expect(w.runLoop("assign").status).toBe("completed");
+  expect(w.runLoop("priority").status).toBe("completed");
+  expect(w.runLoop("summary").status).toBe("completed");
+  expect(w.getSnapshot().inbox.filter((item) => item.kind === "confirmation")).toHaveLength(0);
+});
