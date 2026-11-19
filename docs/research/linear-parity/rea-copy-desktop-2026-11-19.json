@@ -1,0 +1,172 @@
+{
+  "evidence_id": "ev_422f088b04cab2dc05d0a94531d44c94df965bd8b14b53fb1cb8041fd2c0cf4a",
+  "authority": "controlled-replay",
+  "confidence": "observed",
+  "exit": {
+    "code": 0,
+    "signal": 0,
+    "reason": "exited"
+  },
+  "frames": [
+    {
+      "sequence": 0,
+      "at_ms": 1930,
+      "data": "replica-desktop-starting\r\n"
+    },
+    {
+      "sequence": 1,
+      "at_ms": 2170,
+      "data": "replica-desktop-loaded \u001b[33m1\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 2,
+      "at_ms": 2170,
+      "data": "replica-desktop-loaded \u001b[33m2\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 3,
+      "at_ms": 2220,
+      "data": "replica-desktop-window-ready \u001b[33m1\u001b[39m\r\n"
+    },
+    {
+      "sequence": 4,
+      "at_ms": 2220,
+      "data": "replica-desktop-window-ready \u001b[33m2\u001b[39m\r\nreplica-desktop-smoke-pass \u001b[33m2\u001b[39m\r\n"
+    },
+    {
+      "sequence": 5,
+      "at_ms": 2470,
+      "data": "replica-desktop-quit-saved \u001b[33m2\u001b[39m\r\n"
+    }
+  ],
+  "cleanup": {
+    "owned_process_group": "verified",
+    "temporary_root": "removed",
+    "unverified_processes": [
+      {
+        "pid": 13271,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13323,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13439,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13440,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13441,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13442,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13443,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13444,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13579,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13581,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 13578,
+        "reason": "platform_binary_environment_withheld"
+      }
+    ]
+  },
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "The executable digest is a prelaunch file sample; matching path metadata immediately after spawn does not prove an atomic operating-system image binding.",
+    "Process trees are sampled and may omit short-lived descendants.",
+    "Process-tree sampling ended with an incomplete observation.",
+    "Filesystem observations are before/after snapshots, not syscall traces.",
+    "Inherited host environment variables are not recorded and may affect results.",
+    "No filesystem observation paths were selected; filesystem effects remain unknown.",
+    "Process sampling has incomplete observations: Sampler shutdown interrupted an unfinished process observation; unexamined processes remain unknown. See truncation_details.process."
+  ],
+  "residual_unknowns": [
+    {
+      "scope": "process",
+      "reason": "Process trees are sampled and may omit short-lived descendants."
+    },
+    {
+      "scope": "process",
+      "reason": "The executable digest is a prelaunch file sample; operating-system image binding is not atomically observed."
+    },
+    {
+      "scope": "environment",
+      "reason": "Inherited host environment variables are not recorded."
+    },
+    {
+      "scope": "network",
+      "reason": "Network activity is not observed by this capture."
+    },
+    {
+      "scope": "filesystem",
+      "reason": "No filesystem observation paths were selected; filesystem effects remain unknown."
+    },
+    {
+      "scope": "process",
+      "reason": "Process sampling has incomplete observations: Sampler shutdown interrupted an unfinished process observation; unexamined processes remain unknown. See truncation_details.process."
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13271 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13323 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13439 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13440 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13441 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13442 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13443 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13444 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13579 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13581 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    },
+    {
+      "scope": "process",
+      "reason": "Ownership of unrelated process 13578 could not be verified; it was left untouched: platform_binary_environment_withheld"
+    }
+  ]
+}

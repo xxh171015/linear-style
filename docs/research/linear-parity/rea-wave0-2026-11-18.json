@@ -1,0 +1,30 @@
+{
+  "date": "2026-11-18",
+  "evidence_id": "ev_05131ae17c3fb95434b5fb2b0002582dd66dffdaf2446162838501053c23457e",
+  "input_path": "/Applications/Linear.app/Contents/MacOS/Linear",
+  "window_id": 19638,
+  "pid": 24969,
+  "screenshot": "artifacts/qa/source-issue-detail-wave0.png",
+  "context": "Issue detail (XXH-6), not Create issue toolbar",
+  "sidebar_observed": [
+    "Inbox",
+    "My issues",
+    "Reviews",
+    "Agent",
+    "Workspace",
+    "Initiatives",
+    "Projects",
+    "Views",
+    "Loops",
+    "Team: Home, Triage, Issues, Cycles, Projects, Views"
+  ],
+  "code_ahead_of_docs": [
+    "rich-text Mention / Table / Details / slash and @ menus in src/rich-editor.tsx",
+    "comment threads and reactions in src/activity-ui.tsx",
+    "File → New submenu and Print in desktop/main.mjs"
+  ],
+  "limitations": [
+    "Read-only observation; Create issue floating toolbar not captured in this pass",
+    "Screenshot saved locally; not committed"
+  ]
+}

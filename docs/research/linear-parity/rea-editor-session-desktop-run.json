@@ -1,0 +1,146 @@
+{
+  "evidence_id": "ev_8660946d4c28cbc13989e1cb7d4b7ed5682371f16de59d38ab612b3654bc28c0",
+  "operation": "capture_process_scenario",
+  "authority": "controlled-replay",
+  "confidence": "observed",
+  "exit": {
+    "code": 0,
+    "signal": 0,
+    "reason": "exited"
+  },
+  "frames": [
+    {
+      "sequence": 0,
+      "at_ms": 2130,
+      "data": "replica-desktop-starting\r\n"
+    },
+    {
+      "sequence": 1,
+      "at_ms": 2660,
+      "data": "replica-desktop-loaded \u001b[33m1\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 2,
+      "at_ms": 2660,
+      "data": "replica-desktop-loaded \u001b[33m2\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 3,
+      "at_ms": 2700,
+      "data": "replica-desktop-window-ready \u001b[33m2\u001b[39m\r\nreplica-desktop-window-ready \u001b[33m1\u001b[39m\r\nreplica-desktop-smoke-pass \u001b[33m2\u001b[39m\r\n"
+    },
+    {
+      "sequence": 4,
+      "at_ms": 2960,
+      "data": "replica-desktop-quit-saved \u001b[33m2\u001b[39m\r\n"
+    }
+  ],
+  "cleanup": {
+    "owned_process_group": "verified",
+    "temporary_root": "removed",
+    "unverified_processes": [
+      {
+        "pid": 28525,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 28571,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 28572,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 29123,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 29224,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 29267,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 29271,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29294,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29320,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29351,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29484,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29550,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29551,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29602,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29603,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29629,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29630,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29657,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29658,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29659,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29685,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29686,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 29687,
+        "reason": "platform_binary_environment_withheld"
+      }
+    ]
+  },
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "The executable digest is a prelaunch file sample; matching path metadata immediately after spawn does not prove an atomic operating-system image binding.",
+    "Process trees are sampled and may omit short-lived descendants.",
+    "Process-tree sampling ended with an incomplete observation.",
+    "Filesystem observations are before/after snapshots, not syscall traces.",
+    "Inherited host environment variables are not recorded and may affect results.",
+    "No filesystem observation paths were selected; filesystem effects remain unknown.",
+    "Process sampling has incomplete observations: Sampler shutdown interrupted an unfinished process observation; unexamined processes remain unknown. See truncation_details.process."
+  ]
+}

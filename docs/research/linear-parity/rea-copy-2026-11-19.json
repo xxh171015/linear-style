@@ -1,0 +1,2191 @@
+{
+  "analysis_profile": null,
+  "authority": "shipped-artifact",
+  "confidence": "observed",
+  "environment": null,
+  "evidence_id": "ev_f718fd58b69ad301377e2e9ad29365edf4b4c2f316b36901c54f45e9d830fa45",
+  "evidence_links": [],
+  "limitations": [
+    "Only the explicitly selected already-running process/window is admitted. REA starts no target process and does not change permissions, foreground applications, or restore application data.",
+    "Click uses AXPress; scroll uses AXIncrement/AXDecrement; key-entry sets the selected element's AXValue. Unsupported elements fail without global event fallback.",
+    "Each completed action is followed immediately by capture; delayed UI changes require explicit wait steps. A failed after-capture can follow a completed action, so failure does not prove absence of application effects.",
+    "Scenarios can change app data, cause app network activity and persist changes. The caller explicitly chooses leave-as-is; automatic restoration is unsupported.",
+    "Window matching uses exact PID and window ID for screenshots and unique accessibility geometry. Accessibility paths can change as the UI changes; stale or ambiguous paths fail. Screenshots are scaled to at most 2048 pixels; scenario output is budgeted at 64 MiB. Execution uses the selected native_ui_deadline_ms of 180000 ms (omitted means 180000). One wait step stays capped at 180000 ms and that cap has no runtime override."
+  ],
+  "locations": [],
+  "normalized_result": {
+    "initial": {
+      "gaps": [],
+      "nodes": [
+        {
+          "actions": [
+            "AXRaise"
+          ],
+          "children_count": 4,
+          "path": [],
+          "role": "AXWindow",
+          "title": "XXH-6 Spike：Triage 入口规则（needs-spec）",
+          "value": null
+        },
+        {
+          "actions": [],
+          "children_count": 1,
+          "path": [
+            0
+          ],
+          "role": "AXGroup",
+          "title": "XXH-6 Spike：Triage 入口规则（needs-spec）",
+          "value": ""
+        },
+        {
+          "actions": [],
+          "children_count": 1,
+          "path": [
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [],
+          "children_count": 2,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXWebArea",
+          "title": "XXH-6 Spike：Triage 入口规则（needs-spec）",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 18,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "›"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            2
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "New issue"
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            3,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            4
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            4,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            5
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 2,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            0
+          ],
+          "role": "AXTextField",
+          "title": "",
+          "value": "Spike：Triage 入口规则（needs-spec） (copy)"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            0,
+            0,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "Spike：Triage 入口规则（needs-spec） (copy)"
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 6,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0
+          ],
+          "role": "AXTextArea",
+          "title": "",
+          "value": "目的\n验证半成品需求如何在 Triage 被挡住，而不是直接冲进 Cycle。\n要验证\n•\nneeds-spec 标签何时打上\n•\n从 Triage 接受 / 拒绝的判据\n•\n补齐规格后如何入周节奏\n产出\n一段可演示的入口约定（写在 Issue 或 Project 描述即可）"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXHeading",
+          "title": "目的",
+          "value": 2
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "目的"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            1,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "验证半成品需求如何在 Triage 被挡住，而不是直接冲进 Cycle。"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            2
+          ],
+          "role": "AXHeading",
+          "title": "要验证",
+          "value": 2
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            2,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "要验证"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 3,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3
+          ],
+          "role": "AXList",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 2,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            0,
+            0,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "•"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            0,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            0,
+            1,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "needs-spec 标签何时打上"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 2,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            1,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            1,
+            0,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "•"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            1,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            1,
+            1,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "从 Triage 接受 / 拒绝的判据"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 2,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            2
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            2,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            2,
+            0,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "•"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            2,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            3,
+            2,
+            1,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "补齐规格后如何入周节奏"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            4
+          ],
+          "role": "AXHeading",
+          "title": "产出",
+          "value": 2
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            4,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "产出"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            5
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            6,
+            1,
+            0,
+            0,
+            0,
+            5,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "一段可演示的入口约定（写在 Issue 或 Project 描述即可）"
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 4,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7,
+            0,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7,
+            1
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "Quick suggestions"
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7,
+            2
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            7,
+            3
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            8,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            9
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            9,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            10
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            10,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 2,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            11
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            11,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            11,
+            0,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            11,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            11,
+            1,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            12
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            12,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            12,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            12,
+            0,
+            0,
+            0
+          ],
+          "role": "AXStaticText",
+          "title": "",
+          "value": "Spike"
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            13
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            13,
+            0
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            14
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 1,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            15
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            15,
+            0
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            16
+          ],
+          "role": "AXButton",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXShowMenu",
+            "AXScrollToVisible"
+          ],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            17
+          ],
+          "role": "AXButton",
+          "title": "Save copy",
+          "value": ""
+        },
+        {
+          "actions": [],
+          "children_count": 0,
+          "path": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            1
+          ],
+          "role": "AXGroup",
+          "title": "",
+          "value": ""
+        },
+        {
+          "actions": [
+            "AXPress"
+          ],
+          "children_count": 0,
+          "path": [
+            1
+          ],
+          "role": "AXButton",
+          "title": null,
+          "value": null
+        },
+        {
+          "actions": [
+            "AXPress",
+            "AXZoomWindow",
+            "AXShowMenu"
+          ],
+          "children_count": 1,
+          "path": [
+            2
+          ],
+          "role": "AXButton",
+          "title": null,
+          "value": null
+        },
+        {
+          "actions": [],
+          "children_count": 1,
+          "path": [
+            2,
+            0
+          ],
+          "role": "AXGroup",
+          "title": null,
+          "value": null
+        },
+        {
+          "actions": [],
+          "children_count": 0,
+          "path": [
+            2,
+            0,
+            0
+          ],
+          "role": "AXGroup",
+          "title": null,
+          "value": null
+        },
+        {
+          "actions": [
+            "AXPress"
+          ],
+          "children_count": 0,
+          "path": [
+            3
+          ],
+          "role": "AXButton",
+          "title": null,
+          "value": null
+        }
+      ],
+      "screenshot": {
+        "height": 1050,
+        "mime_type": "image/png",
+        "sha256": "4c0a8f33cc5258a71bc457433e88cf1931d12ad1504ffa7de9359f600720fa23",
+        "width": 1920
+      },
+      "truncated": false,
+      "window": {
+        "executable": "/Applications/Linear.app/Contents/MacOS/Linear",
+        "launch_time": 1794910674.772564,
+        "pid": 24969,
+        "title": "XXH-6 Spike：Triage 入口规则（needs-spec）",
+        "window_id": 19638
+      }
+    },
+    "limitations": [
+      "Only the explicitly selected already-running process/window is admitted. REA starts no target process and does not change permissions, foreground applications, or restore application data.",
+      "Click uses AXPress; scroll uses AXIncrement/AXDecrement; key-entry sets the selected element's AXValue. Unsupported elements fail without global event fallback.",
+      "Each completed action is followed immediately by capture; delayed UI changes require explicit wait steps. A failed after-capture can follow a completed action, so failure does not prove absence of application effects.",
+      "Scenarios can change app data, cause app network activity and persist changes. The caller explicitly chooses leave-as-is; automatic restoration is unsupported.",
+      "Window matching uses exact PID and window ID for screenshots and unique accessibility geometry. Accessibility paths can change as the UI changes; stale or ambiguous paths fail. Screenshots are scaled to at most 2048 pixels; scenario output is budgeted at 64 MiB. Execution uses the selected native_ui_deadline_ms of 180000 ms (omitted means 180000). One wait step stays capped at 180000 ms and that cap has no runtime override."
+    ],
+    "restore": "leave-as-is",
+    "steps": [],
+    "target_sha256": "f9d244dd7e13ae5d1b3b7e7647020f735eb4ba042cdb059c2447a7ad3b7a2001"
+  },
+  "operation": "observe_native_ui",
+  "parameters": {
+    "accessibility": true,
+    "max_nodes": 750,
+    "pid": 24969,
+    "screenshot": true,
+    "window_id": 19638
+  },
+  "predicate_type": "rea.analysis",
+  "provider": {
+    "id": "native-macos",
+    "name": "macOS native inspection utilities",
+    "version": null
+  },
+  "raw_result": null,
+  "relationship_coverage": null,
+  "subject": {
+    "architecture": "arm64",
+    "digest": {
+      "sha256": "f9d244dd7e13ae5d1b3b7e7647020f735eb4ba042cdb059c2447a7ad3b7a2001"
+    },
+    "format": "mach-o-universal",
+    "local_path": "/Applications/Linear.app/Contents/MacOS/Linear",
+    "name": "Linear"
+  }
+}

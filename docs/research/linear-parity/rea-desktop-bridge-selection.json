@@ -1,0 +1,253 @@
+{
+  "parent_evidence_id": "ev_a563070e76a5b48f1c5d640753a0355e680a16e77a2d6f0cecf7c352994a5ea4",
+  "artifact_sha256": "5f13f9e9784b1c5a13b761ec50657879408084e8f8ee91fbfb3c6b1aa80b0dd8",
+  "selection": [
+    {
+      "node_id": "jag_node_2cb6e02606e092fdfd225514e5cb53fca6723ef66d727c4ea685b5e6bbc351f1",
+      "label": "n.closeTabRequested",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.closeTabRequested",
+        "mode": "listen",
+        "operation": "on",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 13351,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 13306,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_33fcc3a2f1f99450fb5ac0bce30307d8616f6929877c999e24af04353432db0f",
+      "label": "n.openNewWindow",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.openNewWindow",
+        "mode": "send",
+        "operation": "send",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 10950,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 10911,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_4888e24d657d38164179d8ebccdfa6ad72e442cb1a3a49367e57d9462c857466",
+      "label": "n.setFullScreen",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.setFullScreen",
+        "mode": "send",
+        "operation": "send",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 12868,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 12831,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_72d94e12c27e8e861994c7b4c42ae2677d28dbbd4184c58ecbb4098713da3af4",
+      "label": "n.titlebarDoubleClick",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.titlebarDoubleClick",
+        "mode": "send",
+        "operation": "send",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 10616,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 10575,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_9646cd192776f281d88d6f0809402bee15a69405972fcf7f4dee588de5756429",
+      "label": "n.reopenClosedTabRequested",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.reopenClosedTabRequested",
+        "mode": "listen",
+        "operation": "on",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 13436,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 13384,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_96812f5e67bb27f95efabadec0565d146dd68f1fb0c6de9543e71dcaffea176a",
+      "label": "n.newTab",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.newTab",
+        "mode": "listen",
+        "operation": "on",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 11653,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 11613,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_9fab50a93adbb710139ef963efa3f486b830e6e45197ef4254c3e7a675c22b8d",
+      "label": "n.goBack",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.goBack",
+        "mode": "send",
+        "operation": "send",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 9330,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 9302,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_f14c251f3c4d194c518dba977220d951b220a8877c40c2d92b397ac879db78a7",
+      "label": "n.setDockBadge",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.setDockBadge",
+        "mode": "invoke",
+        "operation": "invoke",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 9530,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 9492,
+            "line": 1
+          }
+        }
+      }
+    },
+    {
+      "node_id": "jag_node_fd908752500759b3fc585563a6c74c8e7e72d2a1b4f16ac80a014b471844d81a",
+      "label": "n.goForward",
+      "properties": {
+        "channel": null,
+        "channel_expression": "n.goForward",
+        "mode": "send",
+        "operation": "send",
+        "resolution": "dynamic",
+        "side": "renderer"
+      },
+      "location": {
+        "available": true,
+        "value": {
+          "end": {
+            "column": 9378,
+            "line": 1
+          },
+          "kind": "source-range",
+          "source": "out/preload/index.js",
+          "start": {
+            "column": 9347,
+            "line": 1
+          }
+        }
+      }
+    }
+  ],
+  "limitations": [
+    "Static syntax observations only; dynamic channel values and runtime pairing remain unresolved.",
+    "This selection is not a complete desktop feature inventory."
+  ]
+}

@@ -1,0 +1,144 @@
+{
+  "date": "2026-11-18",
+  "evidence_id": "ev_a563070e76a5b48f1c5d640753a0355e680a16e77a2d6f0cecf7c352994a5ea4",
+  "input_path": "/Applications/Linear.app/Contents/Resources/app.asar",
+  "sha256": "5f13f9e9784b1c5a13b761ec50657879408084e8f8ee91fbfb3c6b1aa80b0dd8",
+  "statistics": {
+    "findings": 702,
+    "invalid_utf8_files": 0,
+    "modules": 0,
+    "nested_asar_containers": 0,
+    "parse_failures": 0,
+    "parsed_javascript_files": 5,
+    "relevant_files": 14,
+    "skipped_javascript_files": 0,
+    "text_bytes_read": 967795,
+    "visited_ast_nodes": 285965
+  },
+  "electron_summary": {
+    "browser_windows": 0,
+    "context_bridge_apis": 2,
+    "explicit_web_preferences": 0,
+    "exposed_api_members": 0,
+    "ipc": {
+      "ambiguous_renderer_transmissions": 0,
+      "dynamic_channel_operations": 102,
+      "literal_channels": 0,
+      "main_handlers": 0,
+      "operations": 102,
+      "paired_renderer_transmissions": 0,
+      "renderer_listeners": 36,
+      "renderer_transmissions": 66,
+      "unpaired_literal_renderer_transmissions": 0
+    },
+    "native_addon_bindings": 0,
+    "preload_entrypoints": 0,
+    "resolved_native_addon_bindings": 0,
+    "resolved_utility_entrypoints": 0,
+    "sender_validation_observations": 2,
+    "utility_processes": 0
+  },
+  "integrity_contradictions": [
+    {
+      "contradiction_id": "ic_ce938929420ee6b18f8a6f274826b8266e60ff781c36086744e06856409ed03d",
+      "declared_sha256": "970cb796246f28317fea8e66227ee9f5dc674b2c409bf2e16cbb83e5e59beb5f",
+      "entry_kind": "file",
+      "limitations": [
+        "Observed bytes contradict declared integrity metadata and cannot support equivalence."
+      ],
+      "logical_path": "node_modules/@linear/desktop-force-press/build/Release/force_press.node",
+      "observed_sha256": "dba5a0f26d85d0a949f8e1228ce06370648b91cf70422d48ab709a5fe0e0b6e1",
+      "occurrence_id": "occ_b97b474a39b1bb50360139594daa112e76db4879737240e2a7153cd6cc04329f",
+      "parent_artifact_id": "art_79caa35809cc28dd653cd8e6ee4941adc87886a89025f4c73755c78e89df8626",
+      "provenance": "container-integrity-metadata-versus-observed-bytes",
+      "trust": "observed-untrusted",
+      "unpacked": true
+    },
+    {
+      "contradiction_id": "ic_53ced63fbaa4458b4da71ead3971ccb60c965e202c02754e1549f388edc81a14",
+      "declared_sha256": "136f0a70094620ea5039a66e412510e722ddc422e9d77039010571492bd008b2",
+      "entry_kind": "file",
+      "limitations": [
+        "Observed bytes contradict declared integrity metadata and cannot support equivalence."
+      ],
+      "logical_path": "node_modules/@linear/desktop-haptics/build/Release/haptics.node",
+      "observed_sha256": "1baa16f54a0931d24f71979ceb0cc9571340220da5b89ce68446d64cb7ce9c4a",
+      "occurrence_id": "occ_ab34515cfae334eb044dda50ee18aa0b0038bc86fa0615b05ac4a12a26766082",
+      "parent_artifact_id": "art_a181ecc983a8f38e72d70098e6dbeca8e421447f4e85b96647a18e5e4b0b5574",
+      "provenance": "container-integrity-metadata-versus-observed-bytes",
+      "trust": "observed-untrusted",
+      "unpacked": true
+    },
+    {
+      "contradiction_id": "ic_eec0a6fbbac5fe9446dd4590d61dc4143b12814e0281e3219260954706ca0c10",
+      "declared_sha256": "2b65d80265884f7fffca52465e7fc4812f96fd038502ad4f6580abb1bef56589",
+      "entry_kind": "file",
+      "limitations": [
+        "Observed bytes contradict declared integrity metadata and cannot support equivalence."
+      ],
+      "logical_path": "node_modules/@linear/desktop-swipe-navigation/build/Release/swipe_navigation.node",
+      "observed_sha256": "0e1b29cf9130f651093f6a5c8e624c30f25b5f13bc7807c153156f485c266a74",
+      "occurrence_id": "occ_05c6968c44369f2f47b7d9fbdbfb00a1179ed4a95474382befd12dcbf15a3d37",
+      "parent_artifact_id": "art_a6e40a53747b99a1e494b3ba8460a8e4e47309a8de2469b9ae5c485b180c17ea",
+      "provenance": "container-integrity-metadata-versus-observed-bytes",
+      "trust": "observed-untrusted",
+      "unpacked": true
+    }
+  ],
+  "coverage": {
+    "limits": [
+      {
+        "name": "javascript_semantic_alias_selections",
+        "unit": "items",
+        "value": 512
+      }
+    ],
+    "omitted_count": null,
+    "status": "partial",
+    "truncated": false
+  },
+  "limitations": [
+    "3 integrity contradiction(s) were recorded; mismatched content is observed-untrusted.",
+    "Alias selection expansion was conservatively bounded (maximum 512 additional selector states); selected paths remain unknown.",
+    "Artifact integrity metadata contradicts observed bytes at node_modules/@linear/desktop-force-press/build/Release/force_press.node; the observed bytes are untrusted.",
+    "Artifact integrity metadata contradicts observed bytes at node_modules/@linear/desktop-haptics/build/Release/haptics.node; the observed bytes are untrusted.",
+    "Artifact integrity metadata contradicts observed bytes at node_modules/@linear/desktop-swipe-navigation/build/Release/swipe_navigation.node; the observed bytes are untrusted.",
+    "CommonJS and ESM binding relationships were recovered from inert syntax and resolved only within the inventoried artifact container.",
+    "Dynamic IPC channel expressions remain unresolved and are never paired by textual similarity.",
+    "Electron API identity follows proven lexical module aliases and structurally verified module-namespace interop. Other reassignments, dynamic selections, and visibly overwritten namespace members are unresolved; missing findings do not establish absence. Arbitrary call side effects and runtime registration are not evaluated.",
+    "Electron relationships are derived from inert syntax; runtime registration, reachability, defaults, and enforcement remain unproven.",
+    "Graph coverage is incomplete; unavailable facts remain explicit and must not be read as absence.",
+    "JavaScript and HTML were parsed as inert text; bundle bootstrap code was never executed.",
+    "Sender, frame, URL, and origin checks are observations only; REA does not claim that they enforce a complete authorization policy.",
+    "Static imports, entrypoints, workers, endpoints, and storage relationships do not prove runtime execution.",
+    "Static paths and relationships may remain unresolved when expressions are dynamic or obfuscated.",
+    "Webpack/Rspack factories were recovered from AST literals; REA did not invoke push handlers or bundle bootstrap code.",
+    "out/renderer/error.html has 1 inline JavaScript body starting at line 144 that was not analyzed; endpoints, storage, imports and other facts in it are absent from the evidence."
+  ],
+  "packages": [
+    {
+      "path": "package.json",
+      "name": "@linear/desktop",
+      "version": "1.32.8",
+      "main": "./out/main/index.js"
+    },
+    {
+      "path": "node_modules/@linear/desktop-haptics/package.json",
+      "name": "@linear/desktop-haptics",
+      "version": "1.0.0",
+      "main": "./build/Release/haptics.node"
+    },
+    {
+      "path": "node_modules/@linear/desktop-force-press/package.json",
+      "name": "@linear/desktop-force-press",
+      "version": "1.0.0",
+      "main": "./build/Release/force_press.node"
+    },
+    {
+      "path": "node_modules/@linear/desktop-swipe-navigation/package.json",
+      "name": "@linear/desktop-swipe-navigation",
+      "version": "1.0.0",
+      "main": "./build/Release/swipe_navigation.node"
+    }
+  ]
+}

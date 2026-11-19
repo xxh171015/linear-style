@@ -1,0 +1,146 @@
+{
+  "evidence_id": "ev_447f2c839f9d1743fe23c7e74bdc6ad33bbbe3c8477f77ceedec879647904ae4",
+  "authority": "controlled-replay",
+  "confidence": "observed",
+  "exit": {
+    "code": 0,
+    "signal": 0,
+    "reason": "exited"
+  },
+  "frames": [
+    {
+      "sequence": 0,
+      "at_ms": 1970,
+      "data": "replica-desktop-starting\r\n"
+    },
+    {
+      "sequence": 1,
+      "at_ms": 2390,
+      "data": "replica-desktop-loaded \u001b[33m2\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 2,
+      "at_ms": 2390,
+      "data": "replica-desktop-loaded \u001b[33m1\u001b[39m replica://app/index.html\r\n"
+    },
+    {
+      "sequence": 3,
+      "at_ms": 2430,
+      "data": "replica-desktop-window-ready \u001b[33m1\u001b[39m\r\n"
+    },
+    {
+      "sequence": 4,
+      "at_ms": 2440,
+      "data": "replica-desktop-window-ready \u001b[33m2\u001b[39m\r\nreplica-desktop-smoke-pass \u001b[33m2\u001b[39m\r\n"
+    },
+    {
+      "sequence": 5,
+      "at_ms": 2690,
+      "data": "replica-desktop-quit-saved \u001b[33m2\u001b[39m\r\n"
+    }
+  ],
+  "cleanup": {
+    "owned_process_group": "verified",
+    "temporary_root": "removed",
+    "unverified_processes": [
+      {
+        "pid": 47287,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 47288,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 47289,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 47370,
+        "reason": "sysctl_failed_22"
+      },
+      {
+        "pid": 48433,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48459,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48460,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48522,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48523,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48549,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48550,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48579,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48580,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48581,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48582,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48738,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48739,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48740,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48741,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48792,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48793,
+        "reason": "platform_binary_environment_withheld"
+      },
+      {
+        "pid": 48794,
+        "reason": "platform_binary_environment_withheld"
+      }
+    ]
+  },
+  "limitations": [
+    "Artifact identity is unavailable for this observation.",
+    "The executable digest is a prelaunch file sample; matching path metadata immediately after spawn does not prove an atomic operating-system image binding.",
+    "Process trees are sampled and may omit short-lived descendants.",
+    "Process-tree sampling ended with an incomplete observation.",
+    "Filesystem observations are before/after snapshots, not syscall traces.",
+    "Inherited host environment variables are not recorded and may affect results.",
+    "No filesystem observation paths were selected; filesystem effects remain unknown.",
+    "Process sampling has incomplete observations: Sampler shutdown interrupted an unfinished process observation; unexamined processes remain unknown. See truncation_details.process."
+  ]
+}

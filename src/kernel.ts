@@ -14,9 +14,29 @@ import type {
   ViewLayout,
 } from "./types";
 
-export const ISSUE_STATUSES: IssueStatus[] = ["backlog", "todo", "progress", "done", "canceled"];
+export const ISSUE_STATUSES: IssueStatus[] = [
+  "backlog",
+  "todo",
+  "progress",
+  "review",
+  "done",
+  "canceled",
+  "duplicate",
+  "triage",
+];
 
-export const ISSUE_GROUPINGS: IssueGrouping[] = ["status", "priority", "assignee", "project", "none"];
+export const ISSUE_GROUPINGS: IssueGrouping[] = [
+  "none",
+  "status",
+  "status-type",
+  "assignee",
+  "agent",
+  "project",
+  "priority",
+  "cycle",
+  "label",
+  "team",
+];
 
 export const PROJECT_STATUSES: ProjectStatus[] = [
   "backlog",
@@ -31,11 +51,20 @@ export const STATUS_LABEL: Record<IssueStatus, string> = {
   backlog: "Backlog",
   todo: "Todo",
   progress: "In Progress",
+  review: "In Review",
+  duplicate: "Duplicate",
+  triage: "Triage",
   done: "Done",
   canceled: "Canceled",
 };
 
-export const PRIORITY_LABEL = ["No priority", "Urgent", "High", "Medium", "Low"] as const;
+export const PRIORITY_LABEL = [
+  "No priority",
+  "Urgent",
+  "High",
+  "Medium",
+  "Low",
+] as const;
 
 export type CreateIssueInput = {
   title: string;
@@ -54,6 +83,11 @@ export type CreateIssueInput = {
 };
 
 export type IssuePatch = {
+  cycleId?: string | null;
+  dueDate?: string | null;
+  duplicateOfId?: string | null;
+  snoozedUntil?: string | null;
+  updatedAt?: string;
   title?: string;
   body?: string;
   status?: IssueStatus;
@@ -69,6 +103,7 @@ export type IssuePatch = {
 
 export type CreateProjectInput = {
   name: string;
+  summary?: string;
   description?: string;
   slugId?: string;
   lead?: string;
@@ -78,6 +113,7 @@ export type CreateProjectInput = {
 
 export type ProjectPatch = {
   name?: string;
+  summary?: string;
   description?: string;
   status?: ProjectStatus;
   priority?: Priority;
@@ -150,13 +186,18 @@ export function explainViewFilter(
   };
 }
 
-function viewFilterConditionLines(filter: CustomViewFilter, projects: Project[]): string[] {
+function viewFilterConditionLines(
+  filter: CustomViewFilter,
+  projects: Project[],
+): string[] {
   const lines: string[] = [];
   if (filter.assignedToMe) lines.push("Assigned to you");
   if (filter.createdByMe) lines.push("Created by you");
   if (filter.subscribed) lines.push("Subscribed by you");
   if (filter.statuses?.length) {
-    lines.push(`Status is ${filter.statuses.map((status) => STATUS_LABEL[status]).join(" or ")}`);
+    lines.push(
+      `Status is ${filter.statuses.map((status) => STATUS_LABEL[status]).join(" or ")}`,
+    );
   }
   if (filter.projectId) {
     const project = findProject(projects, filter.projectId);
@@ -195,8 +236,14 @@ export type ProductKernel = {
   projectIssues(projectId: string): Issue[];
   getProject(id: string): Project | undefined;
   createProject(input: CreateProjectInput): Project;
-  updateProject(id: string, patch: ProjectPatch): { ok: true; project: Project } | { ok: false };
-  addProjectUpdate(projectId: string, input: CreateProjectUpdateInput): ProjectUpdate | undefined;
+  updateProject(
+    id: string,
+    patch: ProjectPatch,
+  ): { ok: true; project: Project } | { ok: false };
+  addProjectUpdate(
+    projectId: string,
+    input: CreateProjectUpdateInput,
+  ): ProjectUpdate | undefined;
   projectProgress(projectId: string): Progress;
   milestoneProgress(milestoneId: string): Progress;
   projectHealth(projectId: string): ProjectHealth | undefined;
@@ -216,13 +263,13 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
   const milestones = (seed.milestones ?? []).map((item) => ({ ...item }));
 
   function teamIssues(): Issue[] {
-    return issues.filter((item) => item.teamKey === teamKey);
+    return issues.filter((item) => !item.deletedAt && item.teamKey === teamKey);
   }
 
   function issuesForProject(projectId: string): Issue[] {
     const project = findProject(projects, projectId);
     if (!project) return [];
-    return issues.filter((item) => item.projectId === project.id);
+    return issues.filter((item) => !item.deletedAt && item.projectId === project.id);
   }
 
   return {
@@ -233,14 +280,19 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
     projects: () => projects.slice(),
     getIssue: (id) => issues.find((item) => item.id === id),
     teamIssues,
-    myIssuesAssigned: () => teamIssues().filter((item) => item.assignee === viewer),
-    myIssuesCreated: () => teamIssues().filter((item) => item.creator === viewer),
+    myIssuesAssigned: () =>
+      teamIssues().filter((item) => item.assignee === viewer),
+    myIssuesCreated: () =>
+      teamIssues().filter((item) => item.creator === viewer),
     myIssuesSubscribed: () => teamIssues().filter((item) => item.subscribed),
     groupIssues: (items, grouping) => groupIssueList(items, grouping, projects),
     projectIssues: issuesForProject,
     getProject: (id) => findProject(projects, id),
     createProject(input) {
-      const slugId = uniqueSlug(input.slugId ?? slugify(input.name), projectSlugs(projects));
+      const slugId = uniqueSlug(
+        input.slugId ?? slugify(input.name),
+        projectSlugs(projects),
+      );
       const created: Project = {
         id: slugId,
         slugId,
@@ -258,6 +310,7 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
         resources: [],
         updates: [],
       };
+      if (input.summary !== undefined) created.summary = input.summary;
       if (input.lead) created.lead = input.lead;
       if (input.startDate) created.startDate = input.startDate;
       if (input.targetDate) created.targetDate = input.targetDate;
@@ -289,8 +342,11 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
       return estimateProgress(issuesForProject(projectId));
     },
     milestoneProgress(milestoneId) {
-      if (!milestones.some((item) => item.id === milestoneId)) return estimateProgress([]);
-      return estimateProgress(issues.filter((item) => item.milestoneId === milestoneId));
+      if (!milestones.some((item) => item.id === milestoneId))
+        return estimateProgress([]);
+      return estimateProgress(
+        issues.filter((item) => item.milestoneId === milestoneId),
+      );
     },
     projectHealth(projectId) {
       const current = findProject(projects, projectId);
@@ -300,10 +356,15 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
     customViewIssues(viewId) {
       const current = findCustomView(views, viewId);
       if (!current || current.modelName !== "Issue") return [];
-      return teamIssues().filter((item) => matchesViewFilter(item, current.filter, viewer, projects));
+      return teamIssues().filter((item) =>
+        matchesViewFilter(item, current.filter, viewer, projects),
+      );
     },
     createCustomView(input) {
-      const slugId = uniqueSlug(input.slugId ?? slugify(input.name, "view"), viewSlugs(views));
+      const slugId = uniqueSlug(
+        input.slugId ?? slugify(input.name, "view"),
+        viewSlugs(views),
+      );
       const created: CustomView = {
         id: slugId,
         slugId,
@@ -336,13 +397,21 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
       if (input.assignee) created.assignee = input.assignee;
       created.creator = input.creator ?? viewer;
       if (input.estimate !== undefined) created.estimate = input.estimate;
-      if (input.parentId && input.parentId !== id && issues.some((item) => item.id === input.parentId)) {
+      if (
+        input.parentId &&
+        input.parentId !== id &&
+        issues.some((item) => item.id === input.parentId)
+      ) {
         created.parentId = input.parentId;
       }
       const project = findProject(projects, input.projectId);
       if (project) created.projectId = project.id;
       const milestone = findMilestone(milestones, input.milestoneId);
-      if (milestone && created.projectId && milestone.projectId === created.projectId) {
+      if (
+        milestone &&
+        created.projectId &&
+        milestone.projectId === created.projectId
+      ) {
         created.milestoneId = milestone.id;
       }
       issues = [created, ...issues];
@@ -350,9 +419,12 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
     },
     updateIssue(id, patch) {
       const current = issues.find((item) => item.id === id);
-      if (!current) return { ok: false, error: "unknown-issue" };
+      if (!current || current.deletedAt) return { ok: false, error: "unknown-issue" };
       if (patch.parentId === id) return { ok: false, error: "self-parent" };
-      if (patch.parentId && !issues.some((item) => item.id === patch.parentId)) {
+      if (
+        patch.parentId &&
+        !issues.some((item) => item.id === patch.parentId)
+      ) {
         return { ok: false, error: "unknown-parent" };
       }
       const resolved = resolveIssuePatch(current, patch, projects, milestones);
@@ -364,9 +436,15 @@ export function createKernel(seed: KernelSeed = {}): ProductKernel {
   };
 }
 
-function groupIssueList(issues: Issue[], grouping: IssueGrouping, projects: Project[]): IssueGroup[] {
+function groupIssueList(
+  issues: Issue[],
+  grouping: IssueGrouping,
+  projects: Project[],
+): IssueGroup[] {
   if (grouping === "none") {
-    return issues.length ? [{ key: "all", label: "Issues", items: issues }] : [];
+    return issues.length
+      ? [{ key: "all", label: "Issues", items: issues }]
+      : [];
   }
   if (grouping === "status") {
     return ISSUE_STATUSES.map((status) => ({
@@ -375,6 +453,35 @@ function groupIssueList(issues: Issue[], grouping: IssueGrouping, projects: Proj
       status,
       items: issues.filter((item) => item.status === status),
     })).filter((group) => group.items.length > 0);
+  }
+  if (["cycle", "label", "team", "agent", "status-type"].includes(grouping)) {
+    const category: Record<IssueStatus, string> = {
+      backlog: "Backlog",
+      todo: "Unstarted",
+      progress: "Started",
+      review: "Started",
+      done: "Completed",
+      canceled: "Canceled",
+      duplicate: "Canceled",
+      triage: "Triage",
+    };
+    const keys = (item: Issue): string[] =>
+      grouping === "cycle"
+        ? [item.cycleId ?? "No cycle"]
+        : grouping === "label"
+          ? item.labels.length
+            ? item.labels
+            : ["No label"]
+          : grouping === "team"
+            ? [item.teamKey]
+            : grouping === "agent"
+              ? [item.agent ?? "No agent"]
+              : [category[item.status]];
+    return [...new Set(issues.flatMap(keys))].map((key) => ({
+      key,
+      label: key,
+      items: issues.filter((item) => keys(item).includes(key)),
+    }));
   }
   if (grouping === "priority") {
     return ([1, 2, 3, 4, 0] as const)
@@ -386,7 +493,9 @@ function groupIssueList(issues: Issue[], grouping: IssueGrouping, projects: Proj
       .filter((group) => group.items.length > 0);
   }
   if (grouping === "assignee") {
-    const names = [...new Set(issues.map((item) => item.assignee ?? "No assignee"))];
+    const names = [
+      ...new Set(issues.map((item) => item.assignee ?? "No assignee")),
+    ];
     return names.map((name) => ({
       key: name,
       label: name,
@@ -396,19 +505,35 @@ function groupIssueList(issues: Issue[], grouping: IssueGrouping, projects: Proj
   const ids = [...new Set(issues.map((item) => item.projectId ?? "none"))];
   return ids.map((id) => ({
     key: id,
-    label: id === "none" ? "No project" : (projects.find((item) => item.id === id)?.name ?? id),
+    label:
+      id === "none"
+        ? "No project"
+        : (projects.find((item) => item.id === id)?.name ?? id),
     items: issues.filter((item) => (item.projectId ?? "none") === id),
   }));
 }
 
 export function estimateProgress(issues: Issue[]): Progress {
-  const live = issues.filter((item) => item.status !== "canceled");
+  const live = issues.filter(
+    (item) =>
+      !item.deletedAt &&
+      item.status !== "canceled" &&
+      item.status !== "duplicate" &&
+      item.status !== "triage",
+  );
   const scope = live.reduce((sum, item) => sum + issueWeight(item), 0);
   const started = live
-    .filter((item) => item.status === "progress")
+    .filter((item) => item.status === "progress" || item.status === "review")
     .reduce((sum, item) => sum + issueWeight(item), 0);
-  const completed = live.filter((item) => item.status === "done").reduce((sum, item) => sum + issueWeight(item), 0);
-  return { scope, started, completed, ratio: scope === 0 ? 0 : (completed + 0.25 * started) / scope };
+  const completed = live
+    .filter((item) => item.status === "done")
+    .reduce((sum, item) => sum + issueWeight(item), 0);
+  return {
+    scope,
+    started,
+    completed,
+    ratio: scope === 0 ? 0 : (completed + 0.25 * started) / scope,
+  };
 }
 
 function issueWeight(issue: Issue): number {
@@ -431,7 +556,12 @@ function resolveIssuePatch(
   patch: IssuePatch,
   projects: Project[],
   milestones: ProjectMilestone[],
-): { ok: true; patch: IssuePatch } | { ok: false; error: "unknown-project" | "unknown-milestone" | "invalid-milestone" } {
+):
+  | { ok: true; patch: IssuePatch }
+  | {
+      ok: false;
+      error: "unknown-project" | "unknown-milestone" | "invalid-milestone";
+    } {
   let projectId = current.projectId;
   if (patch.projectId !== undefined) {
     if (patch.projectId === null) {
@@ -448,7 +578,8 @@ function resolveIssuePatch(
     if (patch.milestoneId !== null) {
       const milestone = findMilestone(milestones, patch.milestoneId);
       if (!milestone) return { ok: false, error: "unknown-milestone" };
-      if (!projectId || milestone.projectId !== projectId) return { ok: false, error: "invalid-milestone" };
+      if (!projectId || milestone.projectId !== projectId)
+        return { ok: false, error: "invalid-milestone" };
     }
   } else if (patch.projectId !== undefined && current.milestoneId) {
     const milestone = findMilestone(milestones, current.milestoneId);
@@ -461,6 +592,16 @@ function resolveIssuePatch(
 }
 
 function applyIssuePatch(issue: Issue, patch: IssuePatch): void {
+  for (const key of [
+    "cycleId",
+    "dueDate",
+    "duplicateOfId",
+    "snoozedUntil",
+  ] as const) {
+    if (patch[key] === null) delete issue[key];
+    else if (patch[key] !== undefined) issue[key] = patch[key];
+  }
+  if (patch.updatedAt !== undefined) issue.updatedAt = patch.updatedAt;
   if (patch.title !== undefined) issue.title = patch.title;
   if (patch.body !== undefined) issue.body = patch.body;
   if (patch.status !== undefined) issue.status = patch.status;
@@ -490,6 +631,7 @@ function applyIssuePatch(issue: Issue, patch: IssuePatch): void {
 }
 
 function applyProjectPatch(project: Project, patch: ProjectPatch): void {
+  if (patch.summary !== undefined) project.summary = patch.summary;
   if (patch.name !== undefined) project.name = patch.name;
   if (patch.description !== undefined) project.description = patch.description;
   if (patch.status !== undefined) project.status = patch.status;
@@ -508,7 +650,10 @@ function applyProjectPatch(project: Project, patch: ProjectPatch): void {
   }
 }
 
-function findProject(projects: Project[], id: string | undefined): Project | undefined {
+function findProject(
+  projects: Project[],
+  id: string | undefined,
+): Project | undefined {
   if (!id) return undefined;
   return projects.find((item) => item.id === id || item.slugId === id);
 }
@@ -545,7 +690,10 @@ function viewSlugs(views: CustomView[]): Set<string> {
   return new Set(views.flatMap((item) => [item.id, item.slugId]));
 }
 
-function findCustomView(views: CustomView[], id: string | undefined): CustomView | undefined {
+function findCustomView(
+  views: CustomView[],
+  id: string | undefined,
+): CustomView | undefined {
   if (!id) return undefined;
   return views.find((item) => item.id === id || item.slugId === id);
 }
@@ -556,25 +704,49 @@ function matchesViewFilter(
   viewer: string,
   projects: Project[],
 ): boolean {
+  if (
+    filter.and &&
+    !filter.and.every((child) =>
+      matchesViewFilter(issue, child, viewer, projects),
+    )
+  )
+    return false;
+  if (
+    filter.or?.length &&
+    !filter.or.some((child) =>
+      matchesViewFilter(issue, child, viewer, projects),
+    )
+  )
+    return false;
+  if (
+    filter.query &&
+    !`${issue.id} ${issue.title} ${issue.body}`
+      .toLowerCase()
+      .includes(filter.query.toLowerCase())
+  )
+    return false;
+  if (filter.cycleId && issue.cycleId !== filter.cycleId) return false;
   if (filter.assignedToMe && issue.assignee !== viewer) return false;
   if (filter.createdByMe && issue.creator !== viewer) return false;
   if (filter.subscribed && !issue.subscribed) return false;
-  if (filter.statuses?.length && !filter.statuses.includes(issue.status)) return false;
+  if (filter.statuses?.length && !filter.statuses.includes(issue.status))
+    return false;
   if (filter.projectId) {
     const project = findProject(projects, filter.projectId);
     if (!project || issue.projectId !== project.id) return false;
   }
-  if (filter.labels?.length && !filter.labels.some((label) => issue.labels.includes(label))) return false;
-  if (filter.priority !== undefined && issue.priority !== filter.priority) return false;
+  if (
+    filter.labels?.length &&
+    !filter.labels.some((label) => issue.labels.includes(label))
+  )
+    return false;
+  if (filter.priority !== undefined && issue.priority !== filter.priority)
+    return false;
   return true;
 }
 
 function copyFilter(filter: CustomViewFilter): CustomViewFilter {
-  return {
-    ...filter,
-    statuses: filter.statuses ? [...filter.statuses] : undefined,
-    labels: filter.labels ? [...filter.labels] : undefined,
-  };
+  return structuredClone(filter);
 }
 
 function copyIssue(issue: Issue): Issue {
@@ -601,5 +773,8 @@ function copyView(view: CustomView): CustomView {
   return {
     ...view,
     filter: copyFilter(view.filter),
+    projectFilter: view.projectFilter
+      ? structuredClone(view.projectFilter)
+      : undefined,
   };
 }
