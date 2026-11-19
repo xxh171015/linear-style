@@ -60,6 +60,7 @@ export type IssueGrouping =
 export type ViewLayout = "list" | "board";
 
 export type Issue = {
+  links?: IssueLink[];
   reactions?:Record<string,string[]>;
   deletedAt?: string;
   id: string;
@@ -86,6 +87,8 @@ export type Issue = {
   agent?: string;
 };
 
+export type IssueLink = { id: string; url: string; title: string };
+
 export type Activity = {
   reactions?:Record<string,string[]>;
   id: string;
@@ -101,6 +104,7 @@ export type Activity = {
 };
 
 export type InboxItem = {
+  kind?: "reminder";
   id: string;
   issueId: string;
   text: string;
@@ -328,6 +332,7 @@ export type IssueCreationRelation = {
   mode: "related" | "blocking" | "blocked-by" | "parent" | "child";
 };
 export type IssueDraft = {
+  copySourceId?: string;
   milestoneId?: string;
   relation?: IssueCreationRelation;
   title: string;
@@ -347,6 +352,7 @@ export type WorkspaceDocument = {
   title:string;
   body:string;
   projectId?:string;
+  issueId?:string;
   creator:string;
   createdAt:string;
   updatedAt:string;

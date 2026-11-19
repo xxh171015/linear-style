@@ -1,6 +1,7 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, net, Notification, protocol, screen, shell } from 'electron';
 import path from 'node:path';
 import fs from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { APP_ORIGIN, trustedRenderer, localAsset, externalLink, deepLinkRoute } from './policy.mjs';
@@ -8,14 +9,16 @@ import { APP_ORIGIN, trustedRenderer, localAsset, externalLink, deepLinkRoute } 
 const directory = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(directory, '../dist');
 const developmentURL = process.env.REPLICA_DEV_URL;
+const smoke = process.argv.includes('--smoke-test');
+const smokeDirectory = smoke ? fs.mkdtempSync(path.join(tmpdir(),'linear-replica-smoke-')) : undefined;
 if (developmentURL && !/^http:\/\/127\.0\.0\.1:\d+\/?$/.test(developmentURL)) throw Error('Development must use an explicit local preview.');
 app.setName('Linear Replica');
-app.setPath('userData', path.join(app.getPath('appData'), 'Linear Replica'));
+app.setPath('userData', smokeDirectory ?? path.join(app.getPath('appData'), 'Linear Replica'));
+if(smokeDirectory)process.once('exit',()=>fs.rmSync(smokeDirectory,{recursive:true,force:true}));
 protocol.registerSchemesAsPrivileged([{ scheme: 'replica', privileges: { standard: true, secure: true, supportFetchAPI: true } }]);
 const windows = new Map();
 let quitting = false;
 let pendingRoute;
-const smoke = process.argv.includes('--smoke-test');
 const smokeWindows = process.argv.includes('--smoke-two-windows') ? 2 : 1;
 let smokeClosing = false;
 const sessionPath = path.join(app.getPath('userData'), 'window-session.json');

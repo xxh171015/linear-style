@@ -5,10 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && tsc -p tsconfig.server.json && vite build",
     "preview": "vite preview",
+    "server": "tsx server/main.ts",
+    "server:start": "pnpm build && tsx server/main.ts",
     "test": "vitest run",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -b && tsc -p tsconfig.server.json",
     "sandcastle": "tsx .sandcastle/main.mts",
     "desktop": "pnpm build && electron .",
     "desktop:dev": "REPLICA_DEV_URL=http://127.0.0.1:5174 electron .",
@@ -32,6 +34,7 @@
   "devDependencies": {
     "@ai-hero/sandcastle": "^0.13.0",
     "@electron/packager": "^20.3.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@vitejs/plugin-react": "^5.1.0",

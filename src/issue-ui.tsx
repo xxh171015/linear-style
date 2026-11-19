@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import * as I from "./icons";
+import { AccountContext } from "./account-ui";
 import {
   createKernel,
   ISSUE_GROUPINGS,
@@ -39,6 +40,9 @@ import { IssueRelationMenu, IssueRelations, IssueDependencies, RelationPicker, D
 import { openBlockers, type IssueRelationMode } from "./relations";
 import { DeleteIssueDialog } from "./archive-ui";
 import { DescriptionHistory, IssueActivity, Reactions } from "./activity-ui";
+import { IssueReminderDialog } from "./reminder-ui";
+import { IssueLinkDialog, IssueResources } from "./issue-resources";
+import { navigate } from "./router";
 const GROUP_LABEL: Record<IssueGrouping, string> = {
   none: "No grouping",
   status: "Status",
@@ -546,7 +550,7 @@ export function IssueList({
                       <time>{formatDate(issue.dueDate)}</time>
                     )}
                     {show("Links") &&
-                      data.attachments.some((f) => f.ownerId === issue.id) && (
+                      (data.attachments.some((f) => f.ownerId === issue.id) || !!issue.links?.length || data.documents.some(doc=>doc.issueId===issue.id&&!doc.deletedAt)) && (
                         <I.DocsIcon />
                       )}
                     {show("Creator") && <Avatar small name={issue.creator} />}
@@ -626,6 +630,7 @@ export function IssueComposer({
   initialStatus?: IssueStatus;
   relation?: IssueCreationRelation;
 }) {
+  const memberNames=useContext(AccountContext)?.members.map(member=>member.name)??[];
   const data = useData(),
     workspace = useWorkspace();
   const [more, setMore] = useState(false),
@@ -703,7 +708,7 @@ export function IssueComposer({
           New issue <span className="r-push" />
           <Button onClick={onClose}>Save as draft</Button>
         </div>
-        {data.templates.some(template=>!template.deletedAt) && <div className="r-inline r-template-choice"><Choice label="Fill blank fields from template" value="" options={[{value:"",label:"Use template…"},...data.templates.filter(template=>!template.deletedAt).map(template=>({value:template.id,label:template.name}))]} onChange={id=>{if(id)workspace.applyIssueTemplate(id);}}/></div>}
+        {data.templates.some(template=>!template.deletedAt) && <div className="r-inline r-template-choice"><Choice label="Fill blank fields from template" value="" options={[{value:"",label:"Use template…"},...data.templates.filter(template=>!template.deletedAt).map(template=>({value:template.id,label:template.name}))]} onChange={id=>{if(id)try{workspace.applyIssueTemplate(id);setError("");}catch(error){setError(error instanceof Error?error.message:String(error));}}}/></div>}
         {draft.relation && <div className="r-composer-relation" role="status">
           <span>{({related:"Related to", "blocked-by":"Blocking", blocking:"Blocked by", parent:"Sub-issue of", child:"Parent of"})[draft.relation.mode]} {draft.relation.issueId} · {data.issues.find(issue => issue.id === draft.relation?.issueId)?.title ?? "Unavailable issue"}</span>
           <IconButton label="Remove draft relationship" onClick={() => patch({relation: undefined})}><I.CloseIcon /></IconButton>
@@ -746,6 +751,7 @@ export function IssueComposer({
               ...[
                 ...new Set([
                   data.settings.user,
+                  ...memberNames,
                   ...data.issues.flatMap((i) =>
                     i.assignee ? [i.assignee] : [],
                   ),
@@ -816,7 +822,7 @@ export function IssueComposer({
             Create more
           </label>
           <Button primary type="submit" disabled={!draft.title.trim()}>
-            Create issue
+            {draft.copySourceId ? "Save copy" : "Create issue"}
           </Button>
         </footer>
       </form>
@@ -830,6 +836,7 @@ export function IssueDetail({
   onOpen,
   onCreateChild,
   onCreateRelated,
+  onMakeCopy,
   peek = false,
 }: {
   id: string;
@@ -837,14 +844,18 @@ export function IssueDetail({
   onOpen: (id: string) => void;
   onCreateChild: (id: string) => void;
   onCreateRelated?: (relation: IssueCreationRelation) => void;
+  onMakeCopy?: () => void;
   peek?: boolean;
 }) {
+  const memberNames=useContext(AccountContext)?.members.map(member=>member.name)??[];
   const data = useData(),
     workspace = useWorkspace();
   const all = useAllData();
   const issue = all.issues.find((i) => i.id === id);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [showHistory,setShowHistory] = useState(false);
+  const [showReminder,setShowReminder] = useState(false);
+  const [linkEditor,setLinkEditor] = useState<import("./types").IssueLink | "new" | null>(null);
   const [duplicateTarget, setDuplicateTarget] = useState<string | null>(null), [reverseDuplicate, setReverseDuplicate] = useState(false);
   const [relationMode, setRelationMode] = useState<IssueRelationMode | null>(null);
   const [comment, setComment] = useState(""),
@@ -870,6 +881,8 @@ export function IssueDetail({
     setTitle(issue?.title ?? "");
     setBody(issue?.body ?? "");
     setEditing(false);
+    setShowReminder(false);
+    setLinkEditor(null);
     setRelationMode(null);
     setDuplicateTarget(null);
     setTriageAction(null);
@@ -881,6 +894,12 @@ export function IssueDetail({
     const shortcut = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
       if (target.closest?.('input,textarea,select,[contenteditable="true"]') || document.querySelector('[role="dialog"]')) return;
+      if(event.ctrlKey&&!event.metaKey&&!event.altKey&&event.key.toLowerCase()==="l"&&issue&&!issue.deletedAt) {
+        event.preventDefault();setLinkEditor("new");
+      }
+      if (event.shiftKey && event.key.toLowerCase() === "h" && !event.ctrlKey && !event.metaKey && !event.altKey && issue && !issue.deletedAt) {
+        event.preventDefault(); setShowReminder(true);
+      }
       if ((event.metaKey || event.ctrlKey) && ["Delete","Backspace"].includes(event.key) && issue && !issue.deletedAt) {
         event.preventDefault(); setConfirmDelete(true);
       }
@@ -970,6 +989,13 @@ export function IssueDetail({
           <I.StarIcon />
         </IconButton>
         <IssueRelationMenu
+          onAddLink={()=>setLinkEditor("new")}
+          onAddDocument={()=>{try{const doc=workspace.createIssueDocument(id);navigate({nav:"documents",id:doc.id});}catch(e){setError(e instanceof Error?e.message:String(e));}}}
+          onRemind={() => setShowReminder(true)}
+          onMakeCopy={onMakeCopy ? () => {
+            try { workspace.prepareIssueCopy(id); setError(""); onMakeCopy(); }
+            catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+          } : undefined}
           onHistory={()=>setShowHistory(true)}
           onChoose={setRelationMode}
           onDelete={() => setConfirmDelete(true)}
@@ -999,6 +1025,8 @@ export function IssueDetail({
         </IconButton>
       </header>
       {showHistory && <DescriptionHistory id={id} onClose={()=>setShowHistory(false)} />}
+      {showReminder && <IssueReminderDialog key={id} id={id} onClose={()=>setShowReminder(false)} />}
+      {linkEditor && <IssueLinkDialog key={linkEditor==="new"?"new":linkEditor.id} issueId={id} link={linkEditor==="new"?undefined:linkEditor} onClose={()=>setLinkEditor(null)}/>}
       {confirmDelete && <DeleteIssueDialog id={id} onClose={() => setConfirmDelete(false)} />}
       {relationMode && <RelationPicker key={`${id}:${relationMode}`} id={id} mode={relationMode} onClose={() => setRelationMode(null)} onCreate={onCreateRelated ? mode => {
         onCreateRelated({issueId:id,mode}); setRelationMode(null);
@@ -1084,6 +1112,7 @@ export function IssueDetail({
             </div>
           )}
           <Reactions scope="issue" id={id}/>
+          <IssueResources id={id} onEdit={setLinkEditor}/>
           {files.length > 0 && <Attachments ownerId={id} />}
           <div className="r-inline r-detail-tools">
             <FileInput ownerId={id} />
@@ -1213,6 +1242,7 @@ export function IssueDetail({
                 ...[
                   ...new Set([
                     data.settings.user,
+                    ...memberNames,
                     ...data.issues.flatMap((i) =>
                       i.assignee ? [i.assignee] : [],
                     ),

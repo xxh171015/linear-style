@@ -670,3 +670,15 @@ describe("reactions and reusable issue templates",()=>{
     const raw=w.getSnapshot();delete (raw as Partial<WorkspaceData>).templates;expect(migrateData(raw).templates).toEqual([]);
   });
 });
+
+test("invalid template saves cannot poison the workspace and editing never revives a deleted template",()=>{
+  const w=new Workspace(initialData()),fields=w.getSnapshot().draft;
+  const before=w.getSnapshot();
+  expect(()=>w.saveIssueTemplate("Invalid",{...fields,projectId:"missing"})).toThrow("template");
+  expect(w.getSnapshot()).toBe(before);
+  const id=w.saveIssueTemplate("Recoverable",fields);w.setTemplateDeleted(id,true);
+  const deleted=w.getSnapshot();
+  expect(()=>w.saveIssueTemplate("Changed",fields,id)).toThrow("Restore");expect(w.getSnapshot()).toBe(deleted);
+  w.setTemplateDeleted(id,false);w.saveIssueTemplate("Changed",fields,id);
+  expect(migrateData(w.getSnapshot()).templates[0].name).toBe("Changed");
+});

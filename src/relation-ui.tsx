@@ -22,6 +22,10 @@ export function IssueRelationMenu({
   onCreate,
   onHistory,
   onCopyLink,
+  onMakeCopy,
+  onRemind,
+  onAddLink,
+  onAddDocument,
   onSubscribe,
   subscribed,
   onFavorite,
@@ -32,6 +36,10 @@ export function IssueRelationMenu({
   onHistory?:()=>void;
   onCreate?: (mode: IssueCreationRelation["mode"]) => void;
   onCopyLink?: () => void;
+  onMakeCopy?: () => void;
+  onRemind?: () => void;
+  onAddLink?: () => void;
+  onAddDocument?: () => void;
   onSubscribe?: () => void;
   subscribed?: boolean;
   onFavorite?: () => void;
@@ -106,11 +114,15 @@ export function IssueRelationMenu({
         >
           {!submenu ? (
             <>
+              {onAddLink && <button role="menuitem" onClick={()=>{setOpen(false);onAddLink();}}>Add link…</button>}
+              {onAddDocument && <button role="menuitem" onClick={()=>{setOpen(false);onAddDocument();}}>Add document</button>}
               {onCopyLink && <button role="menuitem" onClick={() => { setOpen(false); onCopyLink(); }}>Copy link</button>}
               {onSubscribe && <button role="menuitem" onClick={() => { setOpen(false); onSubscribe(); }}>{subscribed ? "Unsubscribe" : "Subscribe"}</button>}
               {onFavorite && <button role="menuitem" onClick={() => { setOpen(false); onFavorite(); }}>{favorited ? "Remove from favorites" : "Add to favorites"}</button>}
               {onCreate && <button role="menuitem" data-submenu="create" aria-haspopup="menu" onClick={() => setSubmenu("create")}>Create related <I.ChevronIcon /></button>}
               <button role="menuitem" data-submenu="mark" aria-haspopup="menu" onClick={() => setSubmenu("mark")}>Mark as <I.ChevronIcon /></button>
+              {onMakeCopy && <button role="menuitem" onClick={() => { setOpen(false); onMakeCopy(); }}>Make a copy…</button>}
+              {onRemind && <button role="menuitem" onClick={() => { setOpen(false); onRemind(); }}>Remind me <span className="r-push"/>⇧ H</button>}
               {onHistory && <button role="menuitem" onClick={()=>{setOpen(false);onHistory();}}>Show description history</button>}
               {onDelete && <button role="menuitem" onClick={() => { setOpen(false); onDelete(); }}>Delete</button>}
             </>

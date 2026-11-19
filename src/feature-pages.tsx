@@ -1,4 +1,6 @@
-import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { AccountContext } from "./account-ui";
+import { WorkspaceAccounts, WorkspaceMembers } from "./workspace-members-ui";
 import * as I from "./icons";
 import {
   createKernel,
@@ -2613,7 +2615,8 @@ export function ViewsPage({ route, onIssue, onCreate }: PageProps) {
     </>
   );
 }
-export function SettingsPage() {
+export function SettingsPage({section,invite=false}:{section?:string;invite?:boolean}) {
+  const account=useContext(AccountContext);
   const data = useAllData(),
     workspace = useWorkspace();
   const [error, setError] = useState(""),
@@ -2641,14 +2644,19 @@ export function SettingsPage() {
       setError(String(e));
     }
   }
+  if(account&&section==="members")return <><PageHeader title="Members"/><div className="r-document r-members-page"><WorkspaceMembers key={invite?"invite":"members"} initialInvite={invite}/></div></>;
+  if(account&&section==="workspaces")return <><PageHeader title="Workspaces"/><div className="r-document r-settings"><WorkspaceAccounts/></div></>;
   return (
     <>
       <PageHeader title="Settings" />
       <div className="r-document r-settings">
+        {account&&<section><h2>Account</h2><p>Signed in as {account.user.email}</p><p className="r-muted">Shared workspace records are saved on this server. Your drafts, inbox, favorites and chats stay private to your account.</p><div className="r-inline"><Button onClick={account.reconnect}>Reconnect account</Button><Button onClick={()=>void account.signOut().catch(error=>setError(error instanceof Error?error.message:String(error)))}>Sign out</Button></div></section>}
+        <WorkspaceAccounts/>{account&&<Button onClick={()=>navigate({nav:"settings",id:"members"})}>Manage members</Button>}
         <h2>Workspace</h2>
         <Field label="Workspace name">
           <input
             value={data.settings.workspace}
+            disabled={!!account&&account.membership?.role!=="admin"}
             onChange={(e) =>
               workspace.mutate((d) => {
                 d.settings.workspace = e.target.value;
@@ -2658,6 +2666,7 @@ export function SettingsPage() {
         </Field>
         <Field label="Your display name">
           <input
+            disabled={!!account}
             value={data.settings.user}
             onChange={(e) =>
               workspace.mutate((d) => {
@@ -2693,8 +2702,7 @@ export function SettingsPage() {
         <p className="r-muted">{window.replicaDesktop?.notify?"Show new inbox notifications while the desktop app is running. Your system notification settings also apply.":"Available in the desktop app."}</p>
         <h3>Data & storage</h3>
         <p>
-          Workspace records, files, drafts and conversations are saved on this
-          device.
+          {account?"Workspace records, files, drafts and conversations are saved on your account server.":"Workspace records, files, drafts and conversations are saved on this device."}
         </p>
         <div className="r-inline">
           <Button onClick={() => void exportBackup()}>Export workspace</Button>

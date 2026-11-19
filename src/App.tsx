@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useContext,
   useMemo,
   useRef,
   useState,
@@ -60,6 +61,7 @@ import { navigate, readRoute, routeHash, type Route } from "./router";
 import { unreadInboxCount, useNotificationTime, inInboxFolder } from "./notifications";
 import { DocumentsPage } from "./documents-ui";
 import { ArchivePage, DeleteIssueDialog } from "./archive-ui";
+import { AccountContext } from "./account-ui";
 const NAV_LABEL: Record<NavId, string> = {
   inbox: "Inbox",
   "my-issues": "My issues",
@@ -102,6 +104,7 @@ export default function App({ workspace, initialSession }: { workspace: Workspac
   );
 }
 function Shell({initialSession}:{initialSession?:unknown}) {
+  const account=useContext(AccountContext);
   const workspace = useWorkspace(),
     data = useData();
   const all = useAllData();
@@ -144,6 +147,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
     workspace.subscribe,
     () => workspace.saveState,
   );
+  const syncError=useSyncExternalStore(workspace.subscribe,()=>workspace.syncError);
   const routeKey =
     route.nav === "my-issues"
       ? `my-issues/${route.id ?? "assigned"}`
@@ -327,7 +331,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
     ? all.documents.find(doc=>doc.id===route.id)!.title
     : route.issueId
     ? `${route.issueId} ${all.issues.find((i) => i.id === route.issueId)?.title ?? ""}`
-    : NAV_LABEL[route.nav];
+    : route.nav==="settings"&&route.id==="members"?"Members":route.nav==="settings"&&route.id==="workspaces"?"Workspaces":NAV_LABEL[route.nav];
   useEffect(() => { document.title = `${title} — Linear Replica`; }, [title]);
   const commands = useMemo(() => {
     const result: {
@@ -613,7 +617,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
         </IconButton>
         {tabs.items.map(tab => {
           const tabRoute = tab.id === tabs.activeId ? route : tab.route;
-          const label = tabRoute.issueId ? `${tabRoute.issueId} ${all.issues.find(issue=>issue.id===tabRoute.issueId)?.title ?? ""}` : tabRoute.id && tabRoute.nav === "projects" ? all.projects.find(project=>project.id===tabRoute.id)?.name ?? "Projects" : tabRoute.nav==="documents" && tabRoute.id ? all.documents.find(doc=>doc.id===tabRoute.id)?.title ?? "Documents" : NAV_LABEL[tabRoute.nav];
+          const label = tabRoute.issueId ? `${tabRoute.issueId} ${all.issues.find(issue=>issue.id===tabRoute.issueId)?.title ?? ""}` : tabRoute.id && tabRoute.nav === "projects" ? all.projects.find(project=>project.id===tabRoute.id)?.name ?? "Projects" : tabRoute.nav==="documents" && tabRoute.id ? all.documents.find(doc=>doc.id===tabRoute.id)?.title ?? "Documents" : tabRoute.nav==="settings"&&tabRoute.id==="members"?"Members":tabRoute.nav==="settings"&&tabRoute.id==="workspaces"?"Workspaces":NAV_LABEL[tabRoute.nav];
           return <div className={`r-workspace-tab ${tab.id === tabs.activeId ? "active" : ""}`} key={tab.id}>
             <button className="r-title-tab" aria-current={tab.id === tabs.activeId ? "page" : undefined} onClick={() => { const next=selectTab(navigateTab(tabs,route),tab.id);setTabs(next);navigate(activeRoute(next)); }}><I.IssuesIcon /><span>{label}</span></button>
             <IconButton label={`Close tab ${label}`} onClick={() => closeWorkspaceTab(tab.id)}><I.CloseIcon /></IconButton>
@@ -669,6 +673,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
                   <I.SettingsIcon />
                   Settings
                 </button>
+                {account&&<><button onClick={()=>{setWorkspaceMenu(false);navigate({nav:"settings",id:"members"});}}><I.PlusIcon/>Invite and manage members</button><button onClick={()=>{setWorkspaceMenu(false);navigate({nav:"settings",id:"workspaces"});}}><I.SettingsIcon/>Switch workspace</button></>}
                 <button
                   onClick={() => {
                     setWorkspaceMenu(false);
@@ -743,8 +748,9 @@ function Shell({initialSession}:{initialSession?:unknown}) {
               </a>
               <button
                 className="r-nav-item"
-                disabled
-                title="Invitations require a hosted workspace"
+                disabled={!account||account.membership?.role!=="admin"}
+                title={account?"Invite to your workspace":"Invitations require the account server"}
+                onClick={()=>navigate({nav:"settings",id:"members",section:"invite"})}
               >
                 <I.PlusIcon />
                 <span>Invite people</span>
@@ -771,6 +777,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
                 onOpen={(id) => openIssue(id)}
                 onCreateChild={(parentId) => openComposer({ relation: {issueId:parentId,mode:"parent"} })}
                 onCreateRelated={(relation) => openComposer({ relation })}
+                onMakeCopy={() => openComposer()}
               />
             ) : isList ? (
               <>
@@ -914,7 +921,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
             ) : route.nav === "team-home" ? (
               <HomePage {...props} />
             ) : (
-              <SettingsPage />
+              <SettingsPage section={route.id} invite={route.section==="invite"} />
             )}
             {!route.issueId && route.nav !== "agent" && (
               <div className="r-agent-bottom">
@@ -943,6 +950,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
                 onOpen={(id) => openIssue(id)}
                 onCreateChild={(parentId) => openComposer({ relation: {issueId:parentId,mode:"parent"} })}
                 onCreateRelated={(relation) => openComposer({ relation })}
+                onMakeCopy={() => openComposer()}
               />
             </aside>
           )}
@@ -1083,6 +1091,7 @@ function Shell({initialSession}:{initialSession?:unknown}) {
           </Button>
         </div>
       )}
+      {syncError&&saveState!=="error"&&<div className="r-sync-paused" role="status">Sync paused. {syncError} <Button onClick={()=>void workspace.refreshShared()}>Retry sync</Button>{account&&<Button onClick={account.reconnect}>Reconnect account</Button>}</div>}
       {toast && (
         <div className="r-toast" role="status" onClick={() => showToast("")}>
           {toast}

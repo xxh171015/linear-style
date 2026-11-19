@@ -17,3 +17,6 @@ artifacts/rea-*.json
 
 # Local native application builds
 artifacts/desktop/
+
+# Local account database and sessions
+.replica-server/

@@ -1,4 +1,5 @@
 import { mergeWorkspace, WorkspaceConflict } from "./workspace-merge";
+import { normalizeResourceURL } from "./resource-links";
 import {
   offlineServices,
   type ServiceAdapters,
@@ -227,6 +228,15 @@ export function initialData(): WorkspaceData {
   };
 }
 const validReaction=(emoji:string)=>emoji.trim()===emoji && [...emoji].length<=12 && /[\p{Extended_Pictographic}\p{Regional_Indicator}\u20e3]/u.test(emoji) && !/\s/u.test(emoji);
+function validateIssueTemplate(template:import("./types").IssueTemplate,data:WorkspaceData) {
+    const fields=template.fields;
+    if(typeof template.name!=="string" || !fields || typeof fields.title!=="string" || typeof fields.body!=="string" || !ISSUE_STATUSES.includes(fields.status) || ![0,1,2,3,4].includes(fields.priority) || !Array.isArray(fields.labels) || fields.labels.some(label=>typeof label!=="string") ||
+      (template.deletedAt!==undefined && (typeof template.deletedAt!=="string" || !Number.isFinite(Date.parse(template.deletedAt)))) ||
+      "relation" in fields || "parentId" in fields ||
+      (fields.projectId && !data.projects.some(project=>project.id===fields.projectId)) ||
+      (fields.cycleId && !data.cycles.some(cycle=>cycle.id===fields.cycleId)) ||
+      (fields.milestoneId && !data.milestones.some(m=>m.id===fields.milestoneId && m.projectId===fields.projectId)))throw Error("A saved issue template is invalid.");
+}
 export function migrateData(input: unknown): WorkspaceData {
   if (!input || typeof input !== "object")
     throw Error("The saved workspace is not a valid document.");
@@ -280,19 +290,25 @@ export function migrateData(input: unknown): WorkspaceData {
       typeof issue.body !== "string"
     )
       throw Error("A saved issue is invalid.");
-  for(const template of result.templates) {
-    const fields=template.fields;
-    if(typeof template.name!=="string" || !fields || typeof fields.title!=="string" || typeof fields.body!=="string" || !ISSUE_STATUSES.includes(fields.status) || ![0,1,2,3,4].includes(fields.priority) || !Array.isArray(fields.labels) || fields.labels.some(label=>typeof label!=="string") ||
-      (template.deletedAt!==undefined && (typeof template.deletedAt!=="string" || !Number.isFinite(Date.parse(template.deletedAt)))) ||
-      "relation" in fields || "parentId" in fields ||
-      (fields.projectId && !result.projects.some(project=>project.id===fields.projectId)) ||
-      (fields.cycleId && !result.cycles.some(cycle=>cycle.id===fields.cycleId)) ||
-      (fields.milestoneId && !result.milestones.some(m=>m.id===fields.milestoneId && m.projectId===fields.projectId)))throw Error("A saved issue template is invalid.");
+  for(const template of result.templates) validateIssueTemplate(template,result);
+  for (const issue of result.issues) {
+    if (issue.links !== undefined) {
+      if(!Array.isArray(issue.links))throw Error("Saved issue links are invalid.");
+      const ids=new Set<string>(), urls=new Set<string>();
+      for(const link of issue.links) {
+        if(!link || typeof link.id!=="string" || !link.id || ids.has(link.id) || typeof link.title!=="string" || typeof link.url!=="string")throw Error("Saved issue links are invalid.");
+        const url=normalizeResourceURL(link.url);
+        if(urls.has(url))throw Error("Saved issue links contain a duplicate URL.");
+        ids.add(link.id);urls.add(url);link.url=url;
+      }
+    }
   }
   for (const doc of result.documents) {
     if(typeof doc.title!=="string" || typeof doc.body!=="string" || typeof doc.creator!=="string" ||
       [doc.createdAt,doc.updatedAt,...(doc.deletedAt?[doc.deletedAt]:[])].some(time=>typeof time!=="string" || !Number.isFinite(Date.parse(time))) ||
-      (doc.projectId && !result.projects.some(project=>project.id===doc.projectId)))throw Error("A saved document is invalid.");
+      (doc.projectId && !result.projects.some(project=>project.id===doc.projectId)) ||
+      (doc.issueId!==undefined && (typeof doc.issueId!=="string" || !result.issues.some(issue=>issue.id===doc.issueId))) ||
+      (doc.issueId && doc.projectId))throw Error("A saved document is invalid.");
   }
   for(const item of [...result.issues,...result.activity]) {
     if(item.reactions!==undefined && (!item.reactions || typeof item.reactions!=="object" || Array.isArray(item.reactions) || Object.entries(item.reactions).some(([emoji,people])=>!validReaction(emoji) || !Array.isArray(people) || people.some(person=>typeof person!=="string") || new Set(people).size!==people.length)))throw Error("Saved reactions are invalid.");
@@ -300,6 +316,7 @@ export function migrateData(input: unknown): WorkspaceData {
   for (const item of result.inbox) {
     if (typeof item.issueId !== "string" || typeof item.text !== "string" ||
       typeof item.time !== "string" || typeof item.read !== "boolean" ||
+      (item.kind !== undefined && item.kind !== "reminder") ||
       [item.archivedAt, item.snoozedUntil].some(value => value !== undefined &&
         (typeof value !== "string" || !Number.isFinite(Date.parse(value)))))
       throw Error("A saved notification is invalid.");
@@ -328,6 +345,8 @@ export function migrateData(input: unknown): WorkspaceData {
   if (result.draft.relation && (typeof result.draft.relation.issueId !== "string" ||
       !["related", "blocking", "blocked-by", "parent", "child"].includes(result.draft.relation.mode)))
     throw Error("Saved draft relationship is invalid.");
+  if (result.draft.copySourceId !== undefined && typeof result.draft.copySourceId !== "string")
+    throw Error("Saved copy draft is invalid.");
   if (
     typeof result.revision !== "number" ||
     !Number.isFinite(result.revision) ||
@@ -593,6 +612,7 @@ export function matchesProjectFilter(
   );
 }
 export interface Repository {
+  nextIssueIdentifier?(): string;
   load(): Promise<unknown | undefined>;
   save(data: WorkspaceData): Promise<void>;
   commit?(data: WorkspaceData, base: WorkspaceData, preferLocal?: boolean): Promise<WorkspaceData>;
@@ -712,6 +732,7 @@ export class Workspace {
   private services: ServiceAdapters;
   saveState: "saved" | "saving" | "error" = "saved";
   saveError = "";
+  syncError = "";
   constructor(
     data = initialData(),
     repository?: Repository,
@@ -735,7 +756,8 @@ export class Workspace {
         const next=migrateData(loaded);
         if(next.revision>this.data.revision){this.data=next;this.committedLocal=next;this.publish();}
       }
-    } catch(error) { this.saveError=error instanceof Error?error.message:String(error);this.publish(); }
+      if(this.syncError){this.syncError="";this.publish();}
+    } catch(error) { this.syncError=error instanceof Error?error.message:String(error);this.publish(); }
   }
   async useSharedChanges() {
     await this.flushed();
@@ -899,6 +921,27 @@ export class Workspace {
       }
     });
   }
+  scheduleIssueReminder(issueId: string, until: string) {
+    const time = Date.parse(until), now = Date.now();
+    if (!Number.isFinite(time) || time <= now) throw Error("Choose a future reminder time.");
+    const reminderId = uid("reminder");
+    this.mutate(d => {
+      const issue = d.issues.find(item => item.id === issueId && !item.deletedAt);
+      if (!issue) throw Error("Restore this issue before setting a reminder.");
+      // A new ID rearms desktop delivery without altering previously delivered reminders.
+      d.inbox = d.inbox.filter(item => !(item.kind === "reminder" && item.issueId === issueId && !item.archivedAt && Date.parse(item.snoozedUntil ?? "") > now));
+      d.inbox.unshift({id:reminderId,issueId,kind:"reminder",text:`Reminder: ${issue.title}`,
+        time:new Date(time).toISOString(),snoozedUntil:new Date(time).toISOString(),read:false});
+    });
+    return reminderId;
+  }
+  cancelIssueReminder(id: string) {
+    this.mutate(d => {
+      const item = d.inbox.find(item => item.id === id && item.kind === "reminder");
+      if (!item) throw Error("Reminder not found.");
+      item.archivedAt = stamp();
+    });
+  }
   private event(d: WorkspaceData, issue: Issue, text: string, comment?: Pick<Activity, "kind" | "body" | "author" | "parentId">) {
     const time = stamp();
     d.activity.unshift({ id: uid("activity"), issueId: issue.id, text, time, ...comment });
@@ -963,6 +1006,11 @@ export class Workspace {
         ],
         date: formatDate(stamp()),
       });
+      if(this.repository?.nextIssueIdentifier) {
+        let reserved=this.repository.nextIssueIdentifier();
+        while(d.issues.some(issue=>issue.id===reserved))reserved=this.repository.nextIssueIdentifier();
+        created.id=reserved;
+      }
       created.createdAt = stamp();
       created.updatedAt = stamp();
       if (input.cycleId) created.cycleId = input.cycleId;
@@ -1001,6 +1049,20 @@ export class Workspace {
     );
     if (input.relation) this.trigger("issue-updated", input.relation.issueId);
     return created;
+  }
+  prepareIssueCopy(id: string) {
+    this.mutate(d => {
+      const source = d.issues.find(issue => issue.id === id && !issue.deletedAt);
+      if (!source) throw Error("Restore this issue before making a copy.");
+      if (d.draft.title.trim() || d.draft.body.trim() || d.draft.relation || d.attachments.some(file => file.ownerId === "draft"))
+        throw Error("Finish your current issue draft before making a copy.");
+      d.draft = {
+        ...emptyDraft(), copySourceId: id,
+        title: `${source.title} (copy)`, body: source.body, status: source.status,
+        priority: source.priority, assignee: source.assignee, labels: [...source.labels],
+        projectId: source.projectId, milestoneId: source.milestoneId, cycleId: source.cycleId,
+      };
+    });
   }
   updateIssue(id: string, patch: IssuePatch, text?: string) {
     // Reopening a duplicate removes its canonical link, as observed in Linear.
@@ -1101,7 +1163,9 @@ export class Workspace {
     const {relation:_relation,parentId:_parent,...safeFields}=fields as IssueDraft;
     this.mutate(d=>{
       const template={id,name:name.trim(),fields:structuredClone(safeFields)};
+      validateIssueTemplate(template,d);
       const existing=d.templates.findIndex(item=>item.id===id);
+      if(existing>=0 && d.templates[existing].deletedAt)throw Error("Restore this template before editing it.");
       if(existing<0)d.templates.push(template);else d.templates[existing]=template;
     });
     return id;
@@ -1139,20 +1203,55 @@ export class Workspace {
       item.reactions=reactions;
     });
   }
-  createDocument(title:string,body="",projectId?:string) {
+  saveIssueLink(issueId:string,input:{url:string;title:string},linkId?:string) {
+    const url=normalizeResourceURL(input.url),title=input.title.trim() || url;
+    const id=linkId ?? uid("link");
+    this.mutate(d=>{
+      const issue=d.issues.find(issue=>issue.id===issueId && !issue.deletedAt);
+      if(!issue)throw Error("Restore this issue before editing its links.");
+      const links=issue.links ?? [],index=links.findIndex(link=>link.id===id);
+      if(linkId && index<0)throw Error("This link has been removed.");
+      if(links.some(link=>link.id!==id && link.url===url))throw Error("This URL is already linked to this issue.");
+      const link={id,url,title};
+      issue.links=index<0?[...links,link]:links.map(item=>item.id===id?link:item);
+      issue.updatedAt=stamp();this.event(d,issue,`${linkId?"updated":"added"} link ${title}`);
+    });
+    this.trigger("issue-updated",issueId);
+    return id;
+  }
+  removeIssueLink(issueId:string,linkId:string) {
+    this.mutate(d=>{
+      const issue=d.issues.find(issue=>issue.id===issueId && !issue.deletedAt);
+      if(!issue)throw Error("Restore this issue before editing its links.");
+      const link=issue.links?.find(link=>link.id===linkId);if(!link)throw Error("This link has been removed.");
+      issue.links=issue.links!.filter(item=>item.id!==linkId);issue.updatedAt=stamp();this.event(d,issue,`removed link ${link.title}`);
+    });
+    this.trigger("issue-updated",issueId);
+  }
+  createIssueDocument(issueId:string) {
+    return this.createDocument("New document","",undefined,issueId);
+  }
+  createDocument(title:string,body="",projectId?:string,issueId?:string) {
+    if(issueId!==undefined && !issueId)throw Error("Choose an issue for this document.");
     if(!title.trim())throw Error("A document title is required.");
-    const doc:import("./types").WorkspaceDocument={id:uid("doc"),title:title.trim(),body,projectId,creator:this.data.settings.user,createdAt:stamp(),updatedAt:stamp()};
+    const doc:import("./types").WorkspaceDocument={id:uid("doc"),title:title.trim(),body,projectId,issueId,creator:this.data.settings.user,createdAt:stamp(),updatedAt:stamp()};
     this.mutate(d=>{
       if(projectId && !d.projects.some(p=>p.id===projectId))throw Error("Project not found.");
+      if(issueId && !d.issues.some(issue=>issue.id===issueId && !issue.deletedAt))throw Error("Restore this issue before adding a document.");
+      if(projectId && issueId)throw Error("Choose a project or an issue as the document owner.");
       d.documents.unshift(doc);
     });
     return doc;
   }
-  updateDocument(id:string,patch:Partial<Pick<import("./types").WorkspaceDocument,"title"|"body"|"projectId">>) {
+  updateDocument(id:string,patch:Partial<Pick<import("./types").WorkspaceDocument,"title"|"body"|"projectId"|"issueId">>) {
     if(patch.title!==undefined && !patch.title.trim())throw Error("A document title is required.");
     this.mutate(d=>{
       const doc=d.documents.find(doc=>doc.id===id && !doc.deletedAt);if(!doc)throw Error("Restore this document before editing.");
       if(patch.projectId && !d.projects.some(p=>p.id===patch.projectId))throw Error("Project not found.");
+      if(patch.issueId!==undefined && !d.issues.some(issue=>issue.id===patch.issueId && !issue.deletedAt))throw Error("Restore the issue before linking this document.");
+      if(patch.projectId && patch.issueId)throw Error("Choose a project or an issue as the document owner.");
+      if(patch.projectId)delete doc.issueId;
+      if(patch.issueId)delete doc.projectId;
       Object.assign(doc,patch,{updatedAt:stamp()});
       if(patch.title)doc.title=patch.title.trim();
     });

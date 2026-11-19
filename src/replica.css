@@ -3271,3 +3271,64 @@
 .r-reaction-picker { width:260px; display:flex; flex-wrap:wrap; gap:6px; padding:10px; background:#252529; border:1px solid var(--r-line); border-radius:8px; box-shadow:0 8px 24px #0006; }
 .r-reaction-picker>button { padding:4px 6px; }
 .r-reaction-picker input { width:95px; }
+
+.r-reminder-options { display: grid; gap: 3px; }
+.r-reminder-options input { width: 100%; margin-bottom: 10px; }
+.r-reminder-option { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 10px 12px; border: 0; border-radius: 6px; text-align: left; background: transparent; color: inherit; cursor: pointer; }
+.r-reminder-option:hover, .r-reminder-option:focus-visible { background: #292a30; }
+.r-reminder-option time { color: #92939c; font-size: 12px; text-align: right; }
+.r-reminder-option:disabled { opacity: .4; cursor: default; }
+.r-reminder-calendars { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 24px; }
+.r-reminder-calendars h3 { font-size: 13px; font-weight: 500; margin: 12px 0 18px; }
+.r-reminder-calendar { display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 3px; text-align: center; }
+.r-reminder-calendar span { font-size: 11px; color: #92939c; padding: 8px 0; }
+.r-reminder-calendar button { background: transparent; color: inherit; border: 0; border-radius: 50%; padding: 0; width: 100%; aspect-ratio: 1; cursor: pointer; font-size: 12px; }
+.r-reminder-calendar button:hover:not(:disabled) { background: #303139; }
+.r-reminder-calendar button[aria-pressed="true"] { background: #6266d8; color: white; }
+.r-reminder-calendar button:disabled { opacity: .3; cursor: default; }
+.r-reminder-pending { display: flex; align-items: center; gap: 12px; padding: 14px 0; margin-top: 12px; border-top: 1px solid #303137; font-size: 12px; }
+.r-reminder-note { margin-top: 18px; font-size: 12px; line-height: 1.5; }
+@media (max-width: 480px) { .r-reminder-calendars { grid-template-columns: 1fr; } .r-reminder-calendars section:nth-child(2) { display: none; } }
+
+.r-issue-resources { margin: 22px 0; }
+.r-issue-resources h3 { color: #a0a1aa; font-size: 12px; font-weight: 500; margin: 0 0 10px; }
+.r-issue-resources .r-resource { padding: 8px 10px; margin: 5px 0; border: 1px solid #2d2e34; border-radius: 6px; background: #1b1c21; }
+.r-issue-resources .r-resource a { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: inherit; text-decoration: none; }
+.r-issue-resources .r-resource a:hover { text-decoration: underline; }
+.r-issue-resources .r-resource>svg { flex-shrink: 0; width: 16px; height: 16px; color: #9c9da7; }
+.r-document-owner { font-size: 12px; color: #8d8e99; margin: 18px 0; }
+.r-document-owner a { color: #b5b6c0; text-decoration: none; }
+.r-document-owner a:hover { text-decoration: underline; }
+
+.r-account-gate { min-height: 100vh; display: grid; place-items: center; padding: 40px 24px; background: #101114; }
+.r-account-card { width: min(100%,360px); text-align: center; }
+.r-account-mark { margin: 0 auto 18px; font-size: 42px; color: #aaa9f3; }
+.r-account-card h1 { font-size: 23px; letter-spacing: -.5px; line-height: 1.3; font-weight: 600; margin: 20px 0 30px; }
+.r-account-card form { text-align: left; display: grid; gap: 12px; margin-bottom: 20px; }
+.r-account-card form .r-button { width: 100%; justify-content: center; margin-top: 8px; }
+.r-account-card input { width: 100%; min-height: 40px; }
+.r-account-note { color: #81828e; font-size: 12px; line-height: 1.6; margin-top: 30px; }
+.r-account-reconnect .r-account-gate { min-height: auto; padding: 8px; background: transparent; }
+.r-workspace-accounts,.r-members { margin: 28px 0; padding-bottom: 24px; border-bottom: 1px solid var(--r-line, var(--hairline)); }
+.r-members-page { max-width: 1100px; }
+.r-members-page .r-members { margin-top: 0; border-bottom: 0; }
+.r-workspace-list { display: grid; gap: 8px; margin: 14px 0; }
+.r-workspace-list>div,.r-received-invite,.r-pending-invite { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
+.r-workspace-list>div>span,.r-received-invite>span,.r-pending-invite>span { flex: 1; min-width: 0; }
+.r-workspace-accounts small,.r-pending-invite small { display: block; color: var(--r-muted, var(--text-muted)); margin-top: 5px; }
+.r-members>header { display: flex; gap: 8px; align-items: center; margin-bottom: 16px; }
+.r-members>header>div { flex: 1; }
+.r-members h2,.r-members header p { margin: 0 0 6px; }
+.r-members-toolbar { display: flex; gap: 10px; margin-bottom: 16px; flex-wrap: wrap; }
+.r-members-toolbar input { flex: 1; min-width: 180px; }
+.r-member-table { overflow-x: auto; margin: 0 -4px; }
+.r-member-table table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; }
+.r-member-table th,.r-member-table td { padding: 12px 8px; border-bottom: 1px solid var(--r-line, var(--hairline)); white-space: nowrap; }
+.r-member-table th { color: var(--r-muted, var(--text-muted)); font-weight: 400; }
+.r-member-table th button { border: 0; background: transparent; padding: 0; color: inherit; cursor: pointer; font: inherit; }
+.r-member-name { display: flex; align-items: center; gap: 8px; }
+.r-member-name strong { font-weight: 500; }
+.r-member-name small { color: var(--r-muted, var(--text-muted)); }
+.r-pending-members h3 { font-size: 13px; margin: 24px 0 4px; }
+.r-pending-members h3 span { margin-left: 6px; color: var(--r-muted, var(--text-muted)); font-weight: 400; }
+.r-sync-paused { position: fixed; z-index: 100; bottom: 12px; left: 50%; transform: translateX(-50%); padding: 10px 14px; border: 1px solid #615131; border-radius: 8px; background: #29251d; color: #f0dfb7; display: flex; gap: 10px; align-items: center; font-size: 12px; max-width: min(90vw,800px); }
