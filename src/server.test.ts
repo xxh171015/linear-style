@@ -529,3 +529,95 @@ test("signed-in Agent calls the connected model, 409s without one, and never wri
     expect(githubWrites).toEqual([]);
   } finally { globalThis.fetch=original; }
 }));
+test("Agent-proposed Coding session is an Inbox Confirmation and confirm runs argv",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch;
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-agent-"));
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  const issue=w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      return new Response(JSON.stringify({choices:[{message:{content:`{"codingSession":{"issueId":"${issue.id}"}}`}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-coding",baseUrl:"https://models.example"})})).status).toBe(200);
+    const coding=await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd})});
+    expect(coding.status).toBe(200);
+    expect(await coding.json()).toMatchObject({coding:{configured:true,timeoutMs:30*60*1000,cwd,argv:[process.execPath,"-e","process.stdout.write('ok')"]}});
+    const replied=await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Start a coding session"})});
+    expect(replied.status).toBe(200);
+    expect((await replied.json()).message.issueIds).toEqual([issue.id]);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.codingSessions).toEqual([]);
+    const confirmation=bob.inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(confirmation.kind).toBe("confirmation");
+    expect(confirmation.confirmation).toMatchObject({action:"coding-session",issueId:issue.id});
+    expect((await (await a.request("/api/workspace",{headers})).json()).codingSessions).toEqual([]);
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    const after=await (await a.request("/api/workspace",{headers})).json();
+    expect(after.codingSessions[0]).toMatchObject({issueId:issue.id,status:"completed",log:"ok",confirmationId:confirmation.id});
+    expect(after.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+    expect((await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("dismissing a Coding session Confirmation does not spawn",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch;
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-dismiss-"));
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  const issue=w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      return new Response(JSON.stringify({choices:[{message:{content:`{"codingSession":{"issueId":"${issue.id}"}}`}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-coding",baseUrl:"https://models.example"})})).status).toBe(200);
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ran')"],cwd})})).status).toBe(200);
+    expect((await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Start a coding session"})})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect(confirmation.confirmation.action).toBe("coding-session");
+    expect((await b.request(`/api/inbox/${confirmation.id}/dismiss`,{method:"POST",headers})).status).toBe(200);
+    const bob=await (await b.request("/api/workspace",{headers})).json();
+    expect(bob.codingSessions).toEqual([]);
+    expect(bob.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+    const alice=await (await a.request("/api/workspace",{headers})).json();
+    expect(alice.codingSessions).toEqual([]);
+    expect(alice.inbox.find((item:{id:string})=>item.id===confirmation.id).archivedAt).toBeTruthy();
+  } finally { globalThis.fetch=original; }
+}));
+test("a missing Coding session cwd or binary fails the session",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch;
+  const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-fail-"));
+  const missing=path.join(tmpdir(),"yunjing-missing-cwd-session");
+  const repo=new RemoteRepository(a.request,undefined,workspaceId),base=await repo.load(),w=new Workspace(base);
+  const issue=w.createIssue({title:"bug"});
+  await repo.commit(w.getSnapshot(),base);
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.includes("/v1/chat/completions")){
+      return new Response(JSON.stringify({choices:[{message:{content:`{"codingSession":{"issueId":"${issue.id}"}}`}}]}),{headers:{"Content-Type":"application/json"}});
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-coding",baseUrl:"https://models.example"})})).status).toBe(200);
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"-e","process.stdout.write('ok')"],cwd:missing})})).status).toBe(200);
+    expect((await a.request("/api/agent/reply",{method:"POST",headers,body:JSON.stringify({text:"Start a coding session"})})).status).toBe(200);
+    const confirmation=(await (await b.request("/api/workspace",{headers})).json()).inbox.find((item:{kind?:string})=>item.kind==="confirmation");
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(400);
+    expect((await (await a.request("/api/workspace",{headers})).json()).codingSessions).toEqual([]);
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["yunjing-missing-binary-xyz"],cwd})})).status).toBe(200);
+    expect((await b.request(`/api/inbox/${confirmation.id}/confirm`,{method:"POST",headers})).status).toBe(200);
+    const after=await (await a.request("/api/workspace",{headers})).json();
+    expect(after.codingSessions[0].status).toBe("failed");
+  } finally { globalThis.fetch=original; }
+}));
