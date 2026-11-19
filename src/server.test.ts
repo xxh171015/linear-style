@@ -253,6 +253,58 @@ test("only admins paste GitHub tokens and members see a redacted Connection",asy
     expect(JSON.stringify(status)).not.toContain("ghp_test");
   } finally { globalThis.fetch=original; }
 }));
+test("admins paste, rotate and disconnect Connections while members see redacted status",async()=>fixture(async origin=>{
+  const {a,b,workspaceId}=await joinWorkspace(origin),headers={"X-Replica-Workspace":workspaceId};
+  const original=globalThis.fetch,githubCalls:string[]=[];
+  globalThis.fetch=async(input,init)=>{
+    const url=String(input);
+    if(url.startsWith("https://api.github.com")){
+      githubCalls.push(`${init?.method??"GET"} ${url}`);
+      const token=new Headers(init?.headers).get("Authorization")??"";
+      if(url==="https://api.github.com/user")return new Response(JSON.stringify({login:token.includes("ghp_rotated")?"mona":"octocat"}),{headers:{"Content-Type":"application/json"}});
+      throw new Error(`unexpected GitHub ${url}`);
+    }
+    return original(input,init);
+  };
+  try {
+    expect((await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"",repos:[]})})).status).toBe(400);
+    expect((await b.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})})).status).toBe(403);
+    expect((await b.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-secret",baseUrl:"https://api.openai.com/v1",model:"gpt-4"})})).status).toBe(403);
+    const cwd=mkdtempSync(path.join(tmpdir(),"yunjing-coding-conn-"));
+    expect((await b.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["tool"],cwd})})).status).toBe(403);
+    const github=await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_test",repos:["acme/app"]})});
+    expect(github.status).toBe(200);expect(await github.json()).toMatchObject({github:{connected:true,repos:["acme/app"],login:"octocat"}});
+    const githubRotated=await a.request("/api/connections/github",{method:"PUT",headers,body:JSON.stringify({token:"ghp_rotated",repos:["acme/web"]})});
+    expect(githubRotated.status).toBe(200);expect(await githubRotated.json()).toMatchObject({github:{connected:true,repos:["acme/web"],login:"mona"}});
+    const model=await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-secret",baseUrl:"https://api.openai.com/v1",model:"gpt-4"})});
+    expect(model.status).toBe(200);expect(await model.json()).toMatchObject({model:{connected:true,baseUrl:"https://api.openai.com/v1",model:"gpt-4"}});
+    const modelRotated=await a.request("/api/connections/model",{method:"PUT",headers,body:JSON.stringify({apiKey:"sk-rotated",baseUrl:"https://models.example/v1"})});
+    expect(modelRotated.status).toBe(200);expect(await modelRotated.json()).toMatchObject({model:{connected:true,baseUrl:"https://models.example/v1"}});
+    expect((await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["tool"],cwd:"relative"})})).status).toBe(400);
+    const coding=await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:[process.execPath,"{issueId}"],cwd})});
+    expect(coding.status).toBe(200);expect(await coding.json()).toMatchObject({coding:{configured:true,argv:[process.execPath,"{issueId}"],cwd}});
+    const codingRotated=await a.request("/api/connections/coding",{method:"PUT",headers,body:JSON.stringify({argv:["rotated"],cwd})});
+    expect(codingRotated.status).toBe(200);expect(await codingRotated.json()).toMatchObject({coding:{configured:true,argv:["rotated"],cwd}});
+    const status=await (await b.request("/api/connections",{headers})).json();
+    expect(status.github).toEqual({connected:true,repos:["acme/web"],login:"mona"});
+    expect(status.model).toEqual({connected:true,baseUrl:"https://models.example/v1"});
+    expect(status.coding).toMatchObject({configured:true,argv:["rotated"],cwd});
+    const leaked=JSON.stringify(status)+JSON.stringify(await (await b.request("/api/workspace",{headers})).json());
+    expect(leaked).not.toContain("ghp_test");expect(leaked).not.toContain("ghp_rotated");expect(leaked).not.toContain("sk-secret");expect(leaked).not.toContain("sk-rotated");
+    expect(githubCalls.every(line=>line==="GET https://api.github.com/user")).toBe(true);
+    expect(githubCalls.some(line=>/check/i.test(line))).toBe(false);
+    expect((await b.request("/api/connections/github",{method:"DELETE",headers})).status).toBe(403);
+    expect((await b.request("/api/connections/model",{method:"DELETE",headers})).status).toBe(403);
+    expect((await b.request("/api/connections/coding",{method:"DELETE",headers})).status).toBe(403);
+    expect((await a.request("/api/connections/github",{method:"DELETE",headers})).status).toBe(200);
+    expect((await a.request("/api/connections/model",{method:"DELETE",headers})).status).toBe(200);
+    expect((await a.request("/api/connections/coding",{method:"DELETE",headers})).status).toBe(200);
+    const empty=await (await b.request("/api/connections",{headers})).json();
+    expect(empty.github).toEqual({connected:false,repos:[]});
+    expect(empty.model).toEqual({connected:false});
+    expect(empty.coding).toEqual({configured:false});
+  } finally { globalThis.fetch=original; }
+}));
 test("GitHub Review sync stores a pull-request projection and refuses repos outside the allow list",async()=>fixture(async origin=>{
   const c=client(origin);await c.register();
   const original=globalThis.fetch;

@@ -158,6 +158,11 @@ test("offline settings, inbox Confirmation, reviews and cycles expose the connec
   expect(host.textContent).toContain("Cycle length (days)");
   expect(host.querySelector<HTMLInputElement>('input[type="number"]')?.value).toBe("14");
   expect(host.textContent).toContain("This device is offline");
+  expect(host.textContent).not.toContain("Fine-grained personal access token");
+  expect(host.textContent).not.toContain("Save GitHub");
+  expect(host.textContent).not.toContain("Save model");
+  expect(host.textContent).not.toContain("Save coding executor");
+  expect(host.querySelector('input[type="password"]')).toBeNull();
   expect(host.textContent).toContain("Issue templates");
   await act(async()=>e.command({type:"navigate",route:"#/inbox"}));
   await act(async()=>host.querySelector<HTMLButtonElement>(".r-inbox-list button")!.click());

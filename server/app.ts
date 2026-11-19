@@ -202,7 +202,7 @@ export function createReplicaServer({databasePath,staticRoot,publicOrigin}:{data
           } else {
             const argv=Array.isArray(input.argv)?input.argv.map((item:unknown)=>String(item)):undefined;
             const cwd=typeof input.cwd==="string"?input.cwd.trim():"";
-            if(!argv?.length||!cwd)throw new HTTPError(400,"Configure argv and an absolute working directory.");
+            if(!argv?.length||!cwd||!path.isAbsolute(cwd))throw new HTTPError(400,"Configure argv and an absolute working directory.");
             connections.put(selected,"coding","",{argv,cwd,timeoutMs:Number(input.timeoutMs)||30*60*1000} satisfies CodingConfig);
           }
           return respond(res,200,connections.status(selected));
